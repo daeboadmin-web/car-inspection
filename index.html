@@ -146,6 +146,14 @@
   .al-when{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--ink2);
            line-height:1.6;margin-bottom:16px;padding:0 2px;word-break:keep-all}
   .al-when a{font-size:12px;font-weight:600;white-space:nowrap;text-decoration:none;margin-left:6px}
+  .al-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .chip{flex:1;min-width:78px;border:1px solid var(--line);background:none;color:var(--ink2);
+        font-size:12.5px;font-weight:600;padding:9px 6px;border-radius:999px;transition:.15s}
+  .chip:hover{background:var(--hover)}
+  .chip.on{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);font-weight:700}
+  .al-note{font-size:11.5px;color:var(--muted);margin-bottom:16px;line-height:1.6;word-break:keep-all}
+  .al-note a{font-weight:600;text-decoration:none}
   .opt{width:100%;display:block;text-align:left;border:1px solid var(--line);background:none;
        border-radius:12px;padding:15px 16px;margin-bottom:10px;color:var(--ink);transition:.15s}
   .opt:hover{background:var(--hover)}
@@ -382,7 +390,17 @@
       <span id="alSub"></span>
     </div>
 
+    <div class="al-label">알림 시점 <span style="font-weight:500">(오전 9시)</span></div>
+    <div class="chips">
+      <button class="chip" id="ch30" onclick="toggleChip('a30')">30일 전</button>
+      <button class="chip" id="ch7"  onclick="toggleChip('a7')">7일 전</button>
+      <button class="chip" id="ch1"  onclick="toggleChip('a1')">1일 전</button>
+    </div>
     <div class="al-when"><span>🔔</span><span id="alWhen"></span></div>
+    <div class="al-note">
+      여기서 바꾼 시점은 <b>이 차량을 저장할 때만</b> 적용되고 전체 설정은 그대로입니다.
+      <a href="#" id="alSaveDefault" onclick="event.preventDefault();saveAlarmDefault()">기본값으로 저장</a>
+    </div>
 
     <div class="warnbox" id="alInapp" style="display:none">
       <div class="t">지금은 파일 저장이 되지 않습니다</div>
@@ -677,10 +695,10 @@ function ymd(d){ return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'
 function nextDay(d){ const x=new Date(d); x.setDate(x.getDate()+1); return x; }
 
 function alarms(){
-  const set = [];
-  if(OPT.a30) set.push(['-P29DT15H','검사 만료 30일 전']);
-  if(OPT.a7)  set.push(['-P6DT15H','검사 만료 7일 전']);
-  if(OPT.a1)  set.push(['-PT15H','검사 만료 1일 전']);
+  const o = effOpt(), set = [];
+  if(o.a30) set.push(['-P29DT15H','검사 만료 30일 전']);
+  if(o.a7)  set.push(['-P6DT15H','검사 만료 7일 전']);
+  if(o.a1)  set.push(['-PT15H','검사 만료 1일 전']);
   return set;
 }
 
@@ -787,15 +805,41 @@ function icsSteps(){
           '구글 캘린더를 쓰신다면 위의 <b>「구글 캘린더에 저장」</b>이 더 편합니다'];
 }
 
+// 팝업에서만 쓰는 임시 알림 시점 — 열려 있는 동안에만 전역 설정을 대신합니다
+let ALARM_OPT = null;
+function effOpt(){ return ALARM_OPT || OPT; }
+
 // 알림 시점을 사람이 읽는 문장으로
 function alarmSentence(){
-  const on = [];
-  if(OPT.a30) on.push('30일');
-  if(OPT.a7)  on.push('7일');
-  if(OPT.a1)  on.push('1일');
-  if(!on.length) return '<b style="color:var(--warn)">알림 시점이 선택되지 않았습니다.</b> 먼저 설정에서 골라주세요.';
-  return `만료 <b>${on.join(' 전 · ')} 전</b> 오전 9시에 휴대폰이 알려줍니다.`
-       + ` <a href="#" onclick="event.preventDefault();closeAlarm();openSettings()">시점 변경</a>`;
+  const o = effOpt(), on = [];
+  if(o.a30) on.push('30일');
+  if(o.a7)  on.push('7일');
+  if(o.a1)  on.push('1일');
+  if(!on.length) return '<b style="color:var(--warn)">알림 시점을 하나 이상 골라주세요.</b> 지금 저장하면 알림이 울리지 않습니다.';
+  return `만료 <b>${on.join(' 전 · ')} 전</b> 오전 9시에 휴대폰이 알려줍니다.`;
+}
+
+function paintChips(){
+  const o = effOpt();
+  $('ch30').classList.toggle('on', !!o.a30);
+  $('ch7').classList.toggle('on',  !!o.a7);
+  $('ch1').classList.toggle('on',  !!o.a1);
+  $('alWhen').innerHTML = alarmSentence();
+  const same = ['a30','a7','a1'].every(k => !!o[k] === !!OPT[k]);
+  $('alSaveDefault').style.display = same ? 'none' : 'inline';
+}
+function toggleChip(k){
+  if(!ALARM_OPT) ALARM_OPT = { a30:OPT.a30, a7:OPT.a7, a1:OPT.a1 };
+  ALARM_OPT[k] = !ALARM_OPT[k];
+  paintChips();
+  $('alSteps').classList.remove('on');   // 시점이 바뀌었으니 다시 저장해야 함
+}
+function saveAlarmDefault(){
+  if(!ALARM_OPT) return;
+  OPT = { ...OPT, a30:ALARM_OPT.a30, a7:ALARM_OPT.a7, a1:ALARM_OPT.a1 };
+  localStorage.setItem(LS_OPT, JSON.stringify(OPT));
+  paintChips();
+  toast('앞으로 이 시점이 기본값으로 쓰입니다.');
 }
 
 let ALARM_ID = null;
@@ -803,26 +847,27 @@ let ALARM_ID = null;
 function openAlarm(id){
   const v = DATA.find(x=>x.id===id); if(!v) return;
   ALARM_ID = id;
+  ALARM_OPT = null;                       // 열 때마다 전체 설정값으로 되돌립니다
   $('alTitle').textContent = (v.plate || '번호 미입력') + (v.name ? `   ·   ${v.name}` : '');
   $('alSub').textContent   = `${v.kind || '정기검사'} 만료 ${fmtDate(v.due_date)}`;
-  $('alWhen').innerHTML    = alarmSentence();
+  paintChips();
   const app = inAppName();
   $('alInapp').style.display = app ? 'block' : 'none';
   if(app) $('alInappName').textContent = app;
   $('alSteps').classList.remove('on');
   $('alarmModal').classList.add('on');
 }
-function closeAlarm(){ $('alarmModal').classList.remove('on'); }
+function closeAlarm(){ $('alarmModal').classList.remove('on'); ALARM_OPT = null; }
 
 function alarmIcs(){
-  if(!alarms().length){ closeAlarm(); openSettings(); return toast('먼저 알림 시점을 하나 이상 골라주세요.'); }
+  if(!alarms().length) return toast('위에서 알림 시점을 하나 이상 골라주세요.');
   const app = inAppName();
   if(app) return toast(`${app} 안에서는 저장되지 않습니다. 브라우저로 열어주세요.`);
   downloadICS(ALARM_ID);
   $('alStepList').innerHTML = icsSteps().map(t => `<li>${t}</li>`).join('');
   $('alSteps').classList.add('on');
 }
-function alarmGoogle(){ googleCal(ALARM_ID); closeAlarm(); }
+function alarmGoogle(){ const id = ALARM_ID; googleCal(id); closeAlarm(); }
 
 function downloadICS(id){
   const v = DATA.find(x=>x.id===id); if(!v) return;
@@ -859,6 +904,7 @@ function closeSettings(){
   OPT = { a30:$('a30').checked, a7:$('a7').checked, a1:$('a1').checked, yearly:$('aYearly').checked };
   localStorage.setItem(LS_OPT, JSON.stringify(OPT));
   $('setModal').classList.remove('on');
+  if($('alarmModal').classList.contains('on')) paintChips();
 }
 
 function exportJSON(){
