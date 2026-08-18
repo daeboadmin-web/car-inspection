@@ -1,0 +1,73 @@
+# Supabase 자동 깨우기
+#
+# 무료 플랜은 일주일 내내 요청이 없으면 프로젝트를 재웁니다.
+# 이 작업이 매주 월요일·목요일에 서버를 한 번씩 두드려 그걸 막아줍니다.
+#
+# 파일 위치(중요): .github/workflows/keepalive.yml
+# 실패하면 GitHub이 저장소 주인에게 메일을 보냅니다.
+
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # 매주 월·목 03:17 UTC (한국시간 낮 12시 17분)
+    # 주 2회라 한 번 건너뛰어도 안전합니다.
+    - cron: '17 3 * * 1,4'
+  workflow_dispatch:        # Actions 탭에서 수동 실행도 가능
+
+permissions:
+  contents: write           # 아래 '실행 기록' 커밋을 위해 필요
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Supabase 깨우기
+        env:
+          # index.html에 이미 공개되어 있는 anon(공개용) 키입니다.
+          # secret / service_role 키는 여기에 절대 넣지 마세요.
+          SUPABASE_URL: https://tgrspiwnuxhmkstaukjf.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRncnNwaXdudXhobWtzdGF1a2pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNTUxMzgsImV4cCI6MjEwMjYzMTEzOH0.Vv3oUYOTdAApDtacnXvu2d2QBsSrkkrrZqZul_suQfw
+        run: |
+          set -euo pipefail
+          CODE=$(curl -sS -o /tmp/body.txt -w '%{http_code}' --max-time 30 --retry 2 --retry-delay 5 \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/vehicles?select=id&limit=1")
+
+          echo "HTTP ${CODE}"
+          echo "응답: $(head -c 300 /tmp/body.txt)"
+
+          if [ "${CODE}" != "200" ]; then
+            echo "::error::Supabase 응답이 200이 아닙니다 (HTTP ${CODE}). 프로젝트가 정지됐거나 키가 바뀌었을 수 있습니다."
+            exit 1
+          fi
+          echo "✅ Supabase 정상"
+
+      - name: 실행 기록 남기기
+        # 저장소에 커밋이 남아야 이 예약 작업이 60일 후 자동 중지되지 않습니다.
+        run: |
+          set -euo pipefail
+          mkdir -p .github
+          date -u '+%Y-%m-%d %H:%M UTC  ping OK' >> .github/keepalive.log
+          tail -n 60 .github/keepalive.log > .github/keepalive.tmp
+          mv .github/keepalive.tmp .github/keepalive.log
+
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/keepalive.log
+
+          if git diff --staged --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "keepalive: $(date -u '+%Y-%m-%d')"
+            git push
+          fi
