@@ -71,11 +71,10 @@
   .add{border:none;background:var(--brand);color:#fff;font-size:13.5px;font-weight:700;
        padding:9px 15px;border-radius:8px;white-space:nowrap;flex:none}
   .add:hover{filter:brightness(1.08)}
-  .subbar{display:flex;justify-content:flex-end;padding:6px 0 0}
 
   /* ---------- 차량 목록 ---------- */
   .list{margin-top:4px}
-  .row{padding:14px 0 11px;border-bottom:1px solid var(--line2);display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .row{padding:13px 0;border-bottom:1px solid var(--line2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .row:first-child{border-top:1px solid var(--line2)}
   .row .main{flex:1;min-width:0}
   .plate{font-size:15.5px;font-weight:800;letter-spacing:-.02em;word-break:break-all;
@@ -95,9 +94,10 @@
   .s-ok .plate::before{background:var(--ok);opacity:.45}
   .s-none .plate::before{background:var(--muted);opacity:.4}
 
-  .acts{display:flex;gap:4px;align-items:flex-end;width:100%;flex-wrap:wrap;margin-top:6px}
-  .acts .sp{flex:1}
-  .done{font-size:11.5px;font-weight:700;color:var(--ok);align-self:center}
+  .acts{display:flex;gap:2px;align-items:center;flex:none;order:2}
+  .acts .sp{display:none}
+  .row .main{order:1} .row .dday{order:3}
+  .done{font-size:11px;font-weight:700;color:var(--ok);margin-right:6px;white-space:nowrap}
   .act{border:none;background:none;padding:5px 8px;border-radius:7px;text-align:center;color:var(--ink2)}
   .act:hover{background:var(--hover);color:var(--ink)}
   .act b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap}
@@ -144,13 +144,22 @@
   .helpers button{border:1px solid var(--line);background:none;color:var(--ink2);
                   font-size:12px;font-weight:700;padding:6px 10px;border-radius:7px;white-space:nowrap}
   .helpers button:hover{background:var(--hover);color:var(--ink)}
-  .helpers button i{font-style:normal;font-weight:600;opacity:.6;font-size:10.5px;margin-left:3px}
   .hint{font-size:11.5px;color:var(--muted);margin-top:7px;word-break:keep-all;line-height:1.7}
 
-  .infobox{border-left:2px solid var(--line);padding:1px 0 1px 12px;margin:0 0 16px;
-           font-size:11.5px;color:var(--muted);line-height:1.9;word-break:keep-all}
-  .infobox .t{font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:2px}
+  .infobox{font-size:11.5px;color:var(--muted);line-height:1.85;word-break:keep-all;
+           border-top:1px solid var(--line2);margin-top:6px}
+  .infobox summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);padding:11px 0;
+                   list-style:none;display:flex;align-items:center;gap:6px}
+  .infobox summary::-webkit-details-marker{display:none}
+  .infobox summary::before{content:'▸';font-size:10px;transition:.15s}
+  .infobox[open] summary::before{transform:rotate(90deg)}
+  .infobox[open]{padding-bottom:12px}
   .infobox b{color:var(--ink2)}
+
+  .win{font-size:11.5px;font-weight:700;color:var(--ok);margin-top:9px;letter-spacing:-.01em;
+       font-variant-numeric:tabular-nums}
+  .win.none{color:var(--muted);font-weight:600}
+  .row .win{margin-top:2px;font-weight:600;color:var(--ink2);opacity:.9}
 
   .sect{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:2px}
   .check{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px;cursor:pointer}
@@ -175,8 +184,12 @@
     .wrap{padding:14px 14px 0}
     .top h1{font-size:.97rem}
     .dday{min-width:58px}
-    .acts{gap:1px}
-    .act{padding:5px 6px}
+    .acts{width:100%;order:3;justify-content:flex-end;gap:0;margin-top:4px;
+          border-top:1px dashed var(--line2);padding-top:6px}
+    .acts .sp{display:block;flex:1}
+    .row .dday{order:2}
+    .act{padding:5px 5px}
+    .act small{font-size:9.5px}
     .helpers button{flex:1}
   }
 </style>
@@ -203,10 +216,6 @@
     <input id="q" class="search" type="search" placeholder="차량번호 · 팀명 검색" oninput="render()">
     <button class="add" onclick="openEdit(null)">+ 차량 추가</button>
   </div>
-  <div class="subbar">
-    <button class="act" onclick="exportAllICS()"><b>📅 전체 캘린더 등록</b><small>모든 차량을 파일 하나로</small></button>
-  </div>
-
   <div id="list" class="list"></div>
 
   <details class="guide">
@@ -252,31 +261,29 @@
       </select>
     </div>
 
-    <div class="infobox">
-      <div class="t">검사 주기</div>
-      <b>사업용</b> (렌터카 · 영업용)<br>
-      신규등록 후 <b>2년</b>이 지나 첫 검사, 그 뒤로 <b>매년</b><br><br>
-      <b>비사업용</b> (일반 소유차량)<br>
-      신규등록 후 <b>4년</b>이 지나 첫 검사, 그 뒤로 <b>2년마다</b><br><br>
-      검사는 만료일 <b>전후 31일 이내</b>에 받아야 과태료가 없습니다.<br>
-      서울 · 인천 · 경기 전역과 광역시 등 <b>종합검사 시행지역</b> 등록 차량은, 위 차령을 넘으면 정기검사 대신 <b>종합검사</b> 대상입니다.
-    </div>
-
     <div class="field">
       <label for="fDue">검사 유효기간 만료일 *</label>
-      <input id="fDue" type="date">
+      <input id="fDue" type="date" onchange="updateWin()" oninput="updateWin()">
       <div class="helpers">
-        <button type="button" onclick="shiftDue(1)">+1년<i>사업용</i></button>
-        <button type="button" onclick="shiftDue(2)">+2년<i>비사업용</i></button>
         <button type="button" onclick="shiftDue(0)">오늘</button>
+        <button type="button" onclick="shiftDue(1)">+1년</button>
+        <button type="button" onclick="shiftDue(2)">+2년</button>
       </div>
-      <div class="hint">검사를 마친 뒤에는 <b>오늘</b>을 누른 다음 <b>+1년</b> 또는 <b>+2년</b>을 눌러 다음 만료일을 바로 넣을 수 있습니다.</div>
+      <div class="win" id="fWin"></div>
+      <div class="hint">검사를 마친 뒤 다음 만료일을 넣을 때 쓰세요. <b>오늘</b>을 누른 다음 <b>+1년</b> 또는 <b>+2년</b>.</div>
     </div>
 
     <div class="field">
       <label for="fMemo">메모 (선택)</label>
       <input id="fMemo" type="text" autocomplete="off">
     </div>
+
+    <details class="infobox">
+      <summary>자동차검사 주기 안내</summary>
+      <b>사업용</b> (렌터카 · 영업용) — 신규등록 후 <b>2년</b>이 지나 첫 검사, 그 뒤로 <b>매년</b><br>
+      <b>비사업용</b> (일반 소유차량) — 신규등록 후 <b>4년</b>이 지나 첫 검사, 그 뒤로 <b>2년마다</b><br><br>
+      서울 · 인천 · 경기 전역과 광역시 등 <b>종합검사 시행지역</b>에 등록된 차량은, 위 차령을 넘으면 정기검사 대신 <b>종합검사</b> 대상입니다.
+    </details>
 
     <div class="m-acts sticky">
       <button onclick="closeEdit()">취소</button>
@@ -371,6 +378,14 @@ function fmtDate(s){
   const w = ['일','월','화','수','목','금','토'][d.getDay()];
   return `${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2,'0')}. ${String(d.getDate()).padStart(2,'0')} (${w})`;
 }
+function shortDate(d){ return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+// 검사 가능 기간 = 만료일 전후 31일
+function windowText(v){
+  const d = parseDate(v); if(!d) return '';
+  const a = new Date(d); a.setDate(a.getDate()-31);
+  const b = new Date(d); b.setDate(b.getDate()+31);
+  return `${shortDate(a)} ~ ${shortDate(b)}`;
+}
 function isoOf(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function statusOf(v){
   const n = daysLeft(v.due_date);
@@ -464,6 +479,7 @@ function render(){
       <div class="main">
         <div class="plate">${esc(v.plate) || '<span class="none">번호 미입력</span>'}${v.name ? `<span class="team">${esc(v.name)}</span>` : ''}</div>
         <div class="meta">${esc(v.kind||'정기검사')}<span class="dot">·</span>만료 ${fmtDate(v.due_date)}</div>
+        ${windowText(v.due_date) ? `<div class="win">검사 가능 ${windowText(v.due_date)}</div>` : ''}
         ${v.memo ? `<div class="memo">${esc(v.memo)}</div>` : ''}
       </div>
       <div class="dday"><b>${dd}</b><small>${sub}</small></div>
@@ -489,6 +505,7 @@ function openEdit(id){
   $('fKind').value  = v ? (v.kind||'정기검사') : '정기검사';
   $('fDue').value   = v ? (v.due_date||'') : '';
   $('fMemo').value  = v ? (v.memo||'')  : '';
+  updateWin();
   $('editModal').classList.add('on');
   setTimeout(()=>$('fPlate').focus(), 50);
 }
@@ -498,6 +515,12 @@ function shiftDue(years){
   const base = parseDate($('fDue').value) || todayLocal();
   $('fDue').value = isoOf(years === 0 ? todayLocal()
     : new Date(base.getFullYear()+years, base.getMonth(), base.getDate()));
+  updateWin();
+}
+function updateWin(){
+  const w = windowText($('fDue').value), el = $('fWin');
+  el.className = w ? 'win' : 'win none';
+  el.textContent = w ? `검사 가능 기간   ${w}` : '만료일을 넣으면 검사 가능 기간이 표시됩니다.';
 }
 
 async function saveEdit(){
@@ -590,16 +613,6 @@ function downloadICS(id){
   toast('내려받은 .ics 파일을 열면 캘린더에 등록됩니다.');
 }
 
-function exportAllICS(){
-  if(!DATA.length) return toast('등록된 차량이 없습니다.');
-  if(!alarms().length) return toast('설정에서 알림 시점을 하나 이상 선택하세요.');
-  const { text, count } = buildICS(DATA);
-  if(!count) return toast('만료일이 입력된 차량이 없습니다.');
-  saveFile(text, 'car-inspection-all.ics');
-  DATA.forEach(v => { if(parseDate(v.due_date)) markDone(v); });
-  render();
-  toast(`${count}건을 파일 하나로 내보냈습니다.`);
-}
 
 function googleCal(id){
   const v = DATA.find(x=>x.id===id); if(!v) return;
