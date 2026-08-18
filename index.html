@@ -65,6 +65,15 @@
   .alert{font-size:12.5px;color:var(--warn);background:var(--warn-soft);
          padding:12px 14px;border-radius:12px;margin-bottom:14px;word-break:keep-all;line-height:1.65}
   .alert b{color:var(--warn)}
+  .warnbox{background:var(--danger-soft);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .warnbox .t{font-size:13px;font-weight:700;color:var(--danger);margin-bottom:5px;word-break:keep-all}
+  .warnbox p{margin:0 0 11px;font-size:12.5px;color:var(--ink2);line-height:1.65;word-break:keep-all}
+  .warnbox .btns{display:flex;gap:7px;flex-wrap:wrap}
+  .warnbox button{flex:1;min-width:120px;border:none;border-radius:9px;padding:11px 12px;
+                  font-size:13px;font-weight:700;letter-spacing:-.02em}
+  .warnbox .go{background:var(--danger);color:#fff}
+  .warnbox .cp{background:var(--bg);color:var(--ink2);border:1px solid var(--line)}
+  .modal .warnbox{margin-bottom:16px}
 
   /* ---------- 상단 요약 ---------- */
   .stats{display:flex;margin:0 -14px;padding:6px 0}
@@ -258,6 +267,15 @@
     <button class="plain" onclick="openSettings()" title="설정">설정</button>
   </header>
 
+  <div id="inapp" class="warnbox" style="display:none">
+    <div class="t" id="inappTitle"></div>
+    <p id="inappDesc"></p>
+    <div class="btns">
+      <button class="go" onclick="openExternal()">브라우저로 열기</button>
+      <button class="cp" onclick="copyLink()">주소 복사</button>
+    </div>
+  </div>
+
   <div id="alert" class="alert" style="display:none"></div>
 
   <div class="card">
@@ -365,6 +383,17 @@
     </div>
 
     <div class="al-when"><span>🔔</span><span id="alWhen"></span></div>
+
+    <div class="warnbox" id="alInapp" style="display:none">
+      <div class="t">지금은 파일 저장이 되지 않습니다</div>
+      <p><b id="alInappName">이 앱</b> 안에서 열려 있어, 파일을 받아도 저장되지 않고 사라집니다.
+         아래로 브라우저를 연 다음 다시 「알림 받기」를 눌러주세요.
+         <br>급하면 아래 <b>구글 캘린더에 저장</b>은 여기서도 됩니다.</p>
+      <div class="btns">
+        <button class="go" onclick="openExternal()">브라우저로 열기</button>
+        <button class="cp" onclick="copyLink()">주소 복사</button>
+      </div>
+    </div>
 
     <button class="opt primary" onclick="alarmIcs()">
       <b>휴대폰 캘린더에 저장</b>
@@ -690,6 +719,59 @@ function saveFile(text, filename){
   setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 4000);
 }
 
+/* ---------- 인앱 브라우저 ----------
+   카카오톡·네이버 등 앱 안에 내장된 브라우저는 파일 저장이 막혀 있습니다.
+   받아지는 것처럼 보이다가 사라지므로 미리 알려주고 밖으로 빼줍니다. */
+const INAPPS = [
+  [/kakaotalk/i,            '카카오톡'],
+  [/naver\(inapp|NAVER\(inapp|naver/i, '네이버 앱'],
+  [/\bline\//i,             '라인'],
+  [/instagram/i,            '인스타그램'],
+  [/fban|fbav|fb_iab/i,     '페이스북'],
+  [/daumapps/i,             '다음 앱'],
+  [/band\//i,               '밴드'],
+  [/everytimeapp/i,         '에브리타임'],
+  [/inapp|snapchat|whatsapp/i, '앱 내 브라우저']
+];
+function inAppName(){
+  const ua = navigator.userAgent;
+  for(const [re, name] of INAPPS) if(re.test(ua)) return name;
+  return null;
+}
+function isIOSDev(){
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+function openExternal(){
+  const url = location.href, ua = navigator.userAgent;
+  if(/kakaotalk/i.test(ua)){
+    location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url); return;
+  }
+  if(/\bline\//i.test(ua)){
+    location.href = url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1'; return;
+  }
+  if(/android/i.test(ua)){
+    location.href = 'intent://' + url.replace(/https?:\/\//i,'') + '#Intent;scheme=https;package=com.android.chrome;end';
+    return;
+  }
+  copyLink('주소를 복사했습니다. Safari에 붙여넣어 열어주세요.');
+}
+
+async function copyLink(msg){
+  const url = location.href;
+  try{
+    await navigator.clipboard.writeText(url);
+  }catch(e){
+    const t = document.createElement('textarea');
+    t.value = url; t.style.position='fixed'; t.style.opacity='0';
+    document.body.appendChild(t); t.select();
+    try{ document.execCommand('copy'); }catch(e2){}
+    t.remove();
+  }
+  toast(msg || '주소를 복사했습니다. 브라우저에 붙여넣어 주세요.');
+}
+
 // 내려받은 뒤 실제로 캘린더에 넣는 방법은 기기마다 다릅니다
 function icsSteps(){
   const ua = navigator.userAgent;
@@ -724,6 +806,9 @@ function openAlarm(id){
   $('alTitle').textContent = (v.plate || '번호 미입력') + (v.name ? `   ·   ${v.name}` : '');
   $('alSub').textContent   = `${v.kind || '정기검사'} 만료 ${fmtDate(v.due_date)}`;
   $('alWhen').innerHTML    = alarmSentence();
+  const app = inAppName();
+  $('alInapp').style.display = app ? 'block' : 'none';
+  if(app) $('alInappName').textContent = app;
   $('alSteps').classList.remove('on');
   $('alarmModal').classList.add('on');
 }
@@ -731,6 +816,8 @@ function closeAlarm(){ $('alarmModal').classList.remove('on'); }
 
 function alarmIcs(){
   if(!alarms().length){ closeAlarm(); openSettings(); return toast('먼저 알림 시점을 하나 이상 골라주세요.'); }
+  const app = inAppName();
+  if(app) return toast(`${app} 안에서는 저장되지 않습니다. 브라우저로 열어주세요.`);
   downloadICS(ALARM_ID);
   $('alStepList').innerHTML = icsSteps().map(t => `<li>${t}</li>`).join('');
   $('alSteps').classList.add('on');
@@ -813,6 +900,16 @@ async function reload(){
   let t = 'light';
   try{ t = localStorage.getItem(LS_THEME) || 'light'; }catch(e){}
   setTheme(t);
+
+  const app = inAppName();
+  if(app){
+    $('inapp').style.display = 'block';
+    $('inappTitle').textContent = `${app} 안에서 열려 있습니다`;
+    $('inappDesc').innerHTML = '이 상태에서는 <b>캘린더 알림 파일이 저장되지 않습니다.</b> '
+      + '아래 버튼으로 브라우저(크롬 · 사파리)를 열어 사용하세요. '
+      + (isIOSDev() ? '버튼이 듣지 않으면 오른쪽 아래 <b>공유 아이콘 → Safari로 열기</b>를 눌러주세요.'
+                    : '버튼이 듣지 않으면 오른쪽 위 <b>⋮ → 다른 브라우저로 열기</b>를 눌러주세요.');
+  }
 
   const b = $('modeBadge');
   b.className = 'mode ' + (CLOUD ? 'cloud' : 'local');
