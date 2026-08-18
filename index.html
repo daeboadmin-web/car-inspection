@@ -99,6 +99,23 @@
   .foot{margin-top:20px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7;word-break:keep-all}
   code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:12px}
 
+  .date-helpers{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .date-helpers .btn small{font-weight:600;opacity:.65;font-size:10.5px;margin-left:2px}
+
+  .guide{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:0 14px;text-align:left;box-shadow:var(--shadow)}
+  .guide summary{cursor:pointer;font-weight:700;color:var(--ink);font-size:13.5px;padding:13px 0;list-style:none;display:flex;align-items:center;gap:7px}
+  .guide summary::-webkit-details-marker{display:none}
+  .guide summary::before{content:'▸';color:var(--muted);font-size:12px;transition:.15s}
+  .guide[open] summary::before{transform:rotate(90deg)}
+  .guide[open] summary{border-bottom:1px solid var(--line)}
+  .guide-t{width:100%;border-collapse:collapse;margin:12px 0;font-size:12.5px}
+  .guide-t th,.guide-t td{border:1px solid var(--line);padding:7px 9px;text-align:center;vertical-align:middle}
+  .guide-t th{background:var(--bg);font-size:11.5px;color:var(--muted)}
+  .guide-t td span{font-size:11px;color:var(--muted)}
+  .guide ul{margin:10px 0;padding-left:17px;font-size:12.5px;line-height:1.75}
+  .guide li{margin-bottom:5px}
+  .guide p{font-size:12.5px;padding-bottom:13px;margin:10px 0 0}
+
   @media (max-width:480px){
     .wrap{padding:12px 10px 60px}
     .dday{min-width:64px;font-size:.98rem}
@@ -107,6 +124,7 @@
     .acts .btn-sm{padding:7px 8px;font-size:12px}
     .added{font-size:11px}
     .toolbar .btn{flex:1}
+    .date-helpers .btn{flex:1}
     .search{flex:1 1 100%}
   }
   @media (prefers-color-scheme:dark){
@@ -135,7 +153,7 @@
   </div>
 
   <div class="toolbar">
-    <input id="q" class="search" type="search" placeholder="차량번호 · 차량명 검색" oninput="render()">
+    <input id="q" class="search" type="search" placeholder="차량번호 · 팀명 검색" oninput="render()">
     <button class="btn btn-primary" onclick="openEdit(null)">+ 차량 추가</button>
     <button class="btn btn-ghost" onclick="exportAllICS()">📅 전체 내보내기</button>
   </div>
@@ -143,9 +161,20 @@
   <div id="list" class="list"></div>
 
   <div class="foot">
-    <p>사업용 승용자동차(렌터카)는 <b>신규등록 후 2년</b>, 이후 <b>매년</b> 검사 대상입니다.<br>
-    검사는 유효기간 <b>만료일 전후 31일 이내</b>에 받아야 과태료가 없습니다.<br>
-    실제 대상·주기는 <a href="https://www.ts2020.kr" target="_blank" rel="noopener">TS 자동차검사</a>에서 차량번호로 조회해 확인하세요.</p>
+    <details class="guide">
+      <summary>자동차검사 주기 안내 (승용자동차)</summary>
+      <table class="guide-t">
+        <tr><th>구분</th><th>첫 검사</th><th>이후 주기</th></tr>
+        <tr><td><b>사업용</b><br><span>렌터카·영업용</span></td><td>신규등록 후 <b>2년</b></td><td><b>매년</b></td></tr>
+        <tr><td><b>비사업용</b><br><span>일반 소유차량</span></td><td>신규등록 후 <b>4년</b></td><td><b>2년마다</b></td></tr>
+      </table>
+      <ul>
+        <li>검사는 유효기간 <b>만료일 전후 31일 이내</b>에 받아야 과태료가 없습니다.</li>
+        <li>서울·인천·경기 전역과 광역시 등 <b>종합검사 시행지역</b>에 등록된 차량은, 차령이 위 기준을 넘으면 정기검사 대신 <b>종합검사</b>를 받습니다.</li>
+        <li>승합·화물·특수자동차는 주기가 더 짧습니다. 아래에서 차량번호로 조회하세요.</li>
+      </ul>
+      <p>실제 대상·주기·만료일은 <a href="https://www.ts2020.kr" target="_blank" rel="noopener">TS 자동차검사</a>에서 차량번호로 조회해 확인하세요.</p>
+    </details>
   </div>
 </div>
 
@@ -156,29 +185,32 @@
     <input type="hidden" id="fId">
     <div class="field">
       <label for="fPlate">차량번호 *</label>
-      <input id="fPlate" type="text" placeholder="12가 3456" autocomplete="off">
+      <input id="fPlate" type="text" autocomplete="off">
     </div>
     <div class="field">
-      <label for="fName">차량명 / 별칭</label>
-      <input id="fName" type="text" placeholder="1번차량, 아반떼 흰색 등" autocomplete="off">
+      <label for="fName">팀명</label>
+      <input id="fName" type="text" autocomplete="off">
     </div>
     <div class="field">
       <label for="fKind">검사 종류</label>
       <select id="fKind">
         <option>정기검사</option>
         <option>종합검사</option>
-        <option>튜닝검사</option>
-        <option>임시검사</option>
       </select>
     </div>
     <div class="field">
       <label for="fDue">검사 유효기간 만료일 *</label>
       <input id="fDue" type="date">
-      <div class="hint">만료일 <b>전후 31일</b>이 검사 가능 기간입니다. 알림은 만료일 기준으로 계산됩니다.</div>
+      <div class="date-helpers">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="shiftDue(1)">+1년 <small>사업용</small></button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="shiftDue(2)">+2년 <small>비사업용</small></button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="shiftDue(0)">오늘</button>
+      </div>
+      <div class="hint">만료일 <b>전후 31일</b>이 검사 가능 기간입니다. 검사를 마친 뒤에는 위 버튼으로 다음 만료일을 바로 계산할 수 있습니다.</div>
     </div>
     <div class="field">
-      <label for="fMemo">메모</label>
-      <input id="fMemo" type="text" placeholder="담당자, 검사소 등" autocomplete="off">
+      <label for="fMemo">메모 <span style="font-weight:600">(선택)</span></label>
+      <input id="fMemo" type="text" autocomplete="off">
     </div>
     <div class="modal-acts">
       <button class="btn btn-ghost" onclick="closeEdit()">취소</button>
@@ -402,10 +434,17 @@ function openEdit(id){
 }
 function closeEdit(){ $('editModal').classList.remove('on'); }
 
+// 검사 완료 후 다음 만료일 계산 (years=0 이면 오늘)
+function shiftDue(years){
+  const base = parseDate($('fDue').value) || todayLocal();
+  const d = years === 0 ? todayLocal() : new Date(base.getFullYear() + years, base.getMonth(), base.getDate());
+  $('fDue').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 async function saveEdit(){
   const plate = $('fPlate').value.trim();
   const due   = $('fDue').value.trim();
-  if(!plate && !$('fName').value.trim()) return toast('차량번호 또는 차량명을 입력하세요.');
+  if(!plate && !$('fName').value.trim()) return toast('차량번호 또는 팀명을 입력하세요.');
   if(!due) return toast('검사 만료일을 입력하세요.');
 
   const payload = {
