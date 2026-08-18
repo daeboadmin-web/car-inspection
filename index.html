@@ -125,6 +125,31 @@
   .act b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap;letter-spacing:-.02em}
   .act small{display:block;font-size:10px;color:var(--muted);font-weight:500;margin-top:2px;white-space:nowrap}
   .act.warnact:hover{color:var(--danger)}
+  .bell{border:none;background:var(--brand-soft);color:var(--brand);font-size:12.5px;font-weight:700;
+        padding:9px 13px;border-radius:9px;white-space:nowrap;letter-spacing:-.02em;transition:filter .15s}
+  .bell:hover{filter:brightness(.96)}
+
+  /* 알림 받기 팝업 */
+  .al-head{background:var(--page);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  [data-theme="dark"] .al-head{background:var(--hover)}
+  .al-head b{display:block;font-size:15px;font-weight:700;letter-spacing:-.03em}
+  .al-head span{display:block;font-size:12.5px;color:var(--muted);margin-top:4px}
+  .al-when{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--ink2);
+           line-height:1.6;margin-bottom:16px;padding:0 2px;word-break:keep-all}
+  .al-when a{font-size:12px;font-weight:600;white-space:nowrap;text-decoration:none;margin-left:6px}
+  .opt{width:100%;display:block;text-align:left;border:1px solid var(--line);background:none;
+       border-radius:12px;padding:15px 16px;margin-bottom:10px;color:var(--ink);transition:.15s}
+  .opt:hover{background:var(--hover)}
+  .opt b{display:block;font-size:14.5px;font-weight:700;letter-spacing:-.02em}
+  .opt small{display:block;font-size:12px;color:var(--muted);margin-top:4px;font-weight:400;word-break:keep-all;line-height:1.5}
+  .opt.primary{border-color:var(--brand);background:var(--brand-soft)}
+  .opt.primary:hover{filter:brightness(.97)}
+  .opt.primary b{color:var(--brand)}
+  .opt.primary small{color:var(--brand);opacity:.85}
+  .steps{display:none;background:var(--ok-soft);border-radius:12px;padding:14px 16px;margin-top:4px}
+  .steps.on{display:block;animation:slidein .22s ease}
+  .steps .t{font-size:12.5px;font-weight:700;color:var(--ok);margin-bottom:8px}
+  .steps ol{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink2);line-height:1.85;word-break:keep-all}
 
   .empty{text-align:center;color:var(--muted);padding:52px 16px;font-size:14px;line-height:1.8}
 
@@ -329,6 +354,38 @@
   </div>
 </div>
 
+<!-- 알림 받기 -->
+<div class="backdrop" id="alarmModal" onclick="if(event.target===this)closeAlarm()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>검사 알림 받기</h3>
+
+    <div class="al-head">
+      <b id="alTitle"></b>
+      <span id="alSub"></span>
+    </div>
+
+    <div class="al-when"><span>🔔</span><span id="alWhen"></span></div>
+
+    <button class="opt primary" onclick="alarmIcs()">
+      <b>휴대폰 캘린더에 저장</b>
+      <small>알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.</small>
+    </button>
+    <button class="opt" onclick="alarmGoogle()">
+      <b>구글 캘린더에 저장</b>
+      <small>PC에서 쓰기 편합니다. 알림은 구글 캘린더에서 직접 설정하세요.</small>
+    </button>
+
+    <div class="steps" id="alSteps">
+      <div class="t">파일을 받았습니다 · 마지막 단계</div>
+      <ol id="alStepList"></ol>
+    </div>
+
+    <div class="m-acts">
+      <button onclick="closeAlarm()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 설정 -->
 <div class="backdrop" id="setModal" onclick="if(event.target===this)closeSettings()">
   <div class="modal" role="dialog" aria-modal="true">
@@ -517,8 +574,7 @@ function render(){
       <div class="dday"><b>${dd}</b><small>${sub}</small></div>
       <div class="acts">
         <span class="sp"></span>
-        <button class="act" onclick="downloadICS('${v.id}')"><b>📅 .ics</b><small>폰 캘린더 · 알림</small></button>
-        <button class="act" onclick="googleCal('${v.id}')"><b>구글</b><small>PC · 구글 캘린더</small></button>
+        <button class="bell" onclick="openAlarm('${v.id}')">🔔 알림 받기</button>
         <button class="act" onclick="openEdit('${v.id}')"><b>수정</b></button>
         <button class="act warnact" onclick="removeRow('${v.id}')"><b>삭제</b></button>
       </div>
@@ -635,13 +691,51 @@ function saveFile(text, filename){
 }
 
 // 내려받은 뒤 실제로 캘린더에 넣는 방법은 기기마다 다릅니다
-function icsHowTo(){
+function icsSteps(){
   const ua = navigator.userAgent;
   const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  if(iOS)                  return '파일 앱 → 다운로드에서 파일을 눌러 「모두 추가」';
-  if(/Android/.test(ua))   return '다운로드 알림을 눌러 캘린더 앱을 선택하세요';
-  return '내려받은 파일을 열면 PC 캘린더에 추가됩니다';
+  if(iOS) return ['화면 오른쪽 위 <b>다운로드(↓)</b> 아이콘을 누릅니다',
+                  '방금 받은 파일을 누릅니다 <span style="color:var(--muted)">(안 보이면 「파일」 앱 → 다운로드)</span>',
+                  '<b>「모두 추가」</b>를 누르고 캘린더를 고릅니다'];
+  if(/Android/.test(ua)) return ['화면 위 <b>다운로드 완료 알림</b>을 누릅니다',
+                  '<b>Google 캘린더</b>를 선택합니다',
+                  '<b>「추가」</b>를 누릅니다'];
+  return ['내려받은 파일을 <b>더블클릭</b>합니다',
+          '캘린더 앱(Outlook 등)이 열리면 <b>저장</b>합니다',
+          '구글 캘린더를 쓰신다면 위의 <b>「구글 캘린더에 저장」</b>이 더 편합니다'];
 }
+
+// 알림 시점을 사람이 읽는 문장으로
+function alarmSentence(){
+  const on = [];
+  if(OPT.a30) on.push('30일');
+  if(OPT.a7)  on.push('7일');
+  if(OPT.a1)  on.push('1일');
+  if(!on.length) return '<b style="color:var(--warn)">알림 시점이 선택되지 않았습니다.</b> 먼저 설정에서 골라주세요.';
+  return `만료 <b>${on.join(' 전 · ')} 전</b> 오전 9시에 휴대폰이 알려줍니다.`
+       + ` <a href="#" onclick="event.preventDefault();closeAlarm();openSettings()">시점 변경</a>`;
+}
+
+let ALARM_ID = null;
+
+function openAlarm(id){
+  const v = DATA.find(x=>x.id===id); if(!v) return;
+  ALARM_ID = id;
+  $('alTitle').textContent = (v.plate || '번호 미입력') + (v.name ? `   ·   ${v.name}` : '');
+  $('alSub').textContent   = `${v.kind || '정기검사'} 만료 ${fmtDate(v.due_date)}`;
+  $('alWhen').innerHTML    = alarmSentence();
+  $('alSteps').classList.remove('on');
+  $('alarmModal').classList.add('on');
+}
+function closeAlarm(){ $('alarmModal').classList.remove('on'); }
+
+function alarmIcs(){
+  if(!alarms().length){ closeAlarm(); openSettings(); return toast('먼저 알림 시점을 하나 이상 골라주세요.'); }
+  downloadICS(ALARM_ID);
+  $('alStepList').innerHTML = icsSteps().map(t => `<li>${t}</li>`).join('');
+  $('alSteps').classList.add('on');
+}
+function alarmGoogle(){ googleCal(ALARM_ID); closeAlarm(); }
 
 function downloadICS(id){
   const v = DATA.find(x=>x.id===id); if(!v) return;
@@ -649,7 +743,6 @@ function downloadICS(id){
   if(!alarms().length) return toast('설정에서 알림 시점을 하나 이상 선택하세요.');
   const slug = String(v.plate || v.name || '').replace(/[^0-9A-Za-z]/g,'');
   saveFile(buildICS([v]).text, `car-inspection-${slug ? slug+'-' : ''}${v.due_date}.ics`);
-  toast(icsHowTo());
 }
 
 
@@ -731,7 +824,7 @@ async function reload(){
   }
 
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape'){ closeEdit(); $('setModal').classList.remove('on'); }
+    if(e.key === 'Escape'){ closeEdit(); closeAlarm(); $('setModal').classList.remove('on'); }
   });
 
   reload();
