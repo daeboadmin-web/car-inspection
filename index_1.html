@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2937">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="차량검사">
+<title>업무차량 자동차검사 관리</title>
+<style>
+  :root{
+    --bg:#f3f5f7; --card:#fff; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --brand:#2563eb; --brand-d:#1d4ed8;
+    --danger:#dc2626; --danger-bg:#fef2f2; --danger-line:#fecaca;
+    --warn:#b45309;  --warn-bg:#fffbeb;  --warn-line:#fde68a;
+    --ok:#047857;    --ok-bg:#ecfdf5;    --ok-line:#a7f3d0;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.5;
+    -webkit-text-size-adjust:100%; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:16px 14px 64px}
+
+  header.top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  header.top h1{font-size:1.15rem;margin:0;flex:1;letter-spacing:-.02em}
+  .mode{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted);white-space:nowrap}
+  .mode.cloud{color:var(--ok);border-color:var(--ok-line);background:var(--ok-bg)}
+  .mode.local{color:var(--warn);border-color:var(--warn-line);background:var(--warn-bg)}
+  .icon-btn{border:1px solid var(--line);background:#fff;border-radius:10px;width:36px;height:36px;font-size:16px;cursor:pointer;color:var(--muted);flex:none}
+  .icon-btn:hover{background:#f9fafb}
+
+  .notice{font-size:12.5px;color:var(--muted);background:#fff;border:1px solid var(--line);border-left:3px solid var(--warn);
+          border-radius:8px;padding:9px 11px;margin-bottom:12px;word-break:keep-all}
+  .notice b{color:var(--ink)}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:10px 8px;text-align:center;cursor:pointer;box-shadow:var(--shadow);transition:.15s}
+  .stat:hover{transform:translateY(-1px)}
+  .stat.active{border-color:var(--brand);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+  .stat .n{font-size:1.35rem;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:11.5px;color:var(--muted);font-weight:600}
+  .stat.over .n{color:var(--danger)} .stat.soon .n{color:var(--warn)} .stat.all .n{color:var(--ink)}
+
+  .toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .search{flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;background:#fff;color:var(--ink)}
+  .search:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .btn{border:none;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit}
+  .btn-primary{background:var(--brand);color:#fff} .btn-primary:hover{background:var(--brand-d)}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line)} .btn-ghost:hover{background:#f9fafb}
+  .btn-sm{padding:7px 10px;font-size:12.5px;border-radius:8px}
+  .btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line)}
+
+  .list{display:flex;flex-direction:column;gap:10px}
+  .row{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--radius);
+       padding:12px 14px;box-shadow:var(--shadow);display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .row.s-over{border-left-color:var(--danger);background:var(--danger-bg)}
+  .row.s-soon{border-left-color:var(--warn);background:var(--warn-bg)}
+  .row.s-ok{border-left-color:var(--ok)}
+  .row .main{flex:1;min-width:0}
+  .row .plate{font-size:15.5px;font-weight:800;letter-spacing:-.01em;word-break:break-all}
+  .row .alias{font-size:13px;color:var(--muted);font-weight:600;margin-left:6px}
+  .row .meta{font-size:13px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+  .row .memo{font-size:12.5px;color:var(--muted);margin-top:4px;word-break:keep-all}
+  .dday{font-size:1.05rem;font-weight:800;text-align:right;flex:none;min-width:74px;font-variant-numeric:tabular-nums}
+  .dday small{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:1px}
+  .s-over .dday{color:var(--danger)} .s-soon .dday{color:var(--warn)} .s-ok .dday{color:var(--ok)}
+  .acts{display:flex;gap:6px;flex-wrap:wrap;width:100%;padding-top:10px;margin-top:2px;border-top:1px dashed var(--line)}
+  .acts .spacer{flex:1}
+  .added{font-size:11.5px;font-weight:700;color:var(--ok);align-self:center}
+
+  .empty{text-align:center;color:var(--muted);padding:44px 16px;background:#fff;border:1px dashed var(--line);border-radius:var(--radius);font-size:14px}
+
+  .backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+  .backdrop.on{display:flex}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:440px;max-height:90vh;overflow:auto;padding:18px;box-shadow:0 20px 40px rgba(0,0,0,.2)}
+  .modal h3{margin:0 0 14px;font-size:1.05rem}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .field input,.field select,.field textarea{
+    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .field .hint{font-size:11.5px;color:var(--muted);margin-top:5px;word-break:keep-all}
+  .modal-acts{display:flex;gap:8px;margin-top:16px}
+  .modal-acts .btn{flex:1;padding:12px}
+  .check{display:flex;align-items:center;gap:9px;padding:9px 0;font-size:14px;cursor:pointer}
+  .check input{width:18px;height:18px;flex:none;accent-color:var(--brand)}
+  .divider{height:1px;background:var(--line);margin:14px 0}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(80px);background:#111827;color:#fff;
+         padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;opacity:0;transition:.25s;z-index:99;max-width:90vw;text-align:center}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .foot{margin-top:20px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7;word-break:keep-all}
+  code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:12px}
+
+  .date-helpers{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .date-helpers .btn small{font-weight:600;opacity:.65;font-size:10.5px;margin-left:2px}
+
+  .guide{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:0 14px;text-align:left;box-shadow:var(--shadow)}
+  .guide summary{cursor:pointer;font-weight:700;color:var(--ink);font-size:13.5px;padding:13px 0;list-style:none;display:flex;align-items:center;gap:7px}
+  .guide summary::-webkit-details-marker{display:none}
+  .guide summary::before{content:'▸';color:var(--muted);font-size:12px;transition:.15s}
+  .guide[open] summary::before{transform:rotate(90deg)}
+  .guide[open] summary{border-bottom:1px solid var(--line)}
+  .guide-t{width:100%;border-collapse:collapse;margin:12px 0;font-size:12.5px}
+  .guide-t th,.guide-t td{border:1px solid var(--line);padding:7px 9px;text-align:center;vertical-align:middle}
+  .guide-t th{background:var(--bg);font-size:11.5px;color:var(--muted)}
+  .guide-t td span{font-size:11px;color:var(--muted)}
+  .guide ul{margin:10px 0;padding-left:17px;font-size:12.5px;line-height:1.75}
+  .guide li{margin-bottom:5px}
+  .guide p{font-size:12.5px;padding-bottom:13px;margin:10px 0 0}
+
+  @media (max-width:480px){
+    .wrap{padding:12px 10px 60px}
+    .dday{min-width:64px;font-size:.98rem}
+    .row{padding:11px 12px}
+    .acts{gap:5px;flex-wrap:nowrap}
+    .acts .btn-sm{padding:7px 8px;font-size:12px}
+    .added{font-size:11px}
+    .toolbar .btn{flex:1}
+    .date-helpers .btn{flex:1}
+    .search{flex:1 1 100%}
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0f1115;--card:#171a20;--ink:#e5e7eb;--muted:#9aa3af;--line:#2a2f3a;
+          --danger-bg:#2a1416;--warn-bg:#2a2110;--ok-bg:#0f2620}
+    .icon-btn,.search,.btn-ghost,.mode,.tag,.modal,.field input,.field select,.field textarea,.stat,.notice,.empty{background:var(--card);color:var(--ink)}
+    code{background:#232833}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>업무차량 자동차검사 관리</h1>
+    <span id="modeBadge" class="mode local">확인 중…</span>
+    <button class="icon-btn" onclick="openSettings()" title="설정" aria-label="설정">⚙</button>
+  </header>
+
+  <div id="notice" class="notice" style="display:none"></div>
+
+  <div class="stats">
+    <div class="stat over" data-f="over" onclick="setFilter('over')"><div class="n" id="cOver">0</div><div class="l">기한 초과</div></div>
+    <div class="stat soon" data-f="soon" onclick="setFilter('soon')"><div class="n" id="cSoon">0</div><div class="l">30일 이내</div></div>
+    <div class="stat all"  data-f="all"  onclick="setFilter('all')"><div class="n" id="cAll">0</div><div class="l">전체 차량</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input id="q" class="search" type="search" placeholder="차량번호 · 팀명 검색" oninput="render()">
+    <button class="btn btn-primary" onclick="openEdit(null)">+ 차량 추가</button>
+    <button class="btn btn-ghost" onclick="exportAllICS()">📅 전체 내보내기</button>
+  </div>
+
+  <div id="list" class="list"></div>
+
+  <div class="foot">
+    <details class="guide">
+      <summary>자동차검사 주기 안내 (승용자동차)</summary>
+      <table class="guide-t">
+        <tr><th>구분</th><th>첫 검사</th><th>이후 주기</th></tr>
+        <tr><td><b>사업용</b><br><span>렌터카·영업용</span></td><td>신규등록 후 <b>2년</b></td><td><b>매년</b></td></tr>
+        <tr><td><b>비사업용</b><br><span>일반 소유차량</span></td><td>신규등록 후 <b>4년</b></td><td><b>2년마다</b></td></tr>
+      </table>
+      <ul>
+        <li>검사는 유효기간 <b>만료일 전후 31일 이내</b>에 받아야 과태료가 없습니다.</li>
+        <li>서울·인천·경기 전역과 광역시 등 <b>종합검사 시행지역</b>에 등록된 차량은, 차령이 위 기준을 넘으면 정기검사 대신 <b>종합검사</b>를 받습니다.</li>
+        <li>승합·화물·특수자동차는 주기가 더 짧습니다. 아래에서 차량번호로 조회하세요.</li>
+      </ul>
+      <p>실제 대상·주기·만료일은 <a href="https://www.ts2020.kr" target="_blank" rel="noopener">TS 자동차검사</a>에서 차량번호로 조회해 확인하세요.</p>
+    </details>
+  </div>
+</div>
+
+<!-- 차량 추가/수정 -->
+<div class="backdrop" id="editModal" onclick="if(event.target===this)closeEdit()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="editTitle">차량 추가</h3>
+    <input type="hidden" id="fId">
+    <div class="field">
+      <label for="fPlate">차량번호 *</label>
+      <input id="fPlate" type="text" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="fName">팀명</label>
+      <input id="fName" type="text" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="fKind">검사 종류</label>
+      <select id="fKind">
+        <option>정기검사</option>
+        <option>종합검사</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fDue">검사 유효기간 만료일 *</label>
+      <input id="fDue" type="date">
+      <div class="date-helpers">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="shiftDue(1)">+1년 <small>사업용</small></button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="shiftDue(2)">+2년 <small>비사업용</small></button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="shiftDue(0)">오늘</button>
+      </div>
+      <div class="hint">만료일 <b>전후 31일</b>이 검사 가능 기간입니다. 검사를 마친 뒤에는 위 버튼으로 다음 만료일을 바로 계산할 수 있습니다.</div>
+    </div>
+    <div class="field">
+      <label for="fMemo">메모 <span style="font-weight:600">(선택)</span></label>
+      <input id="fMemo" type="text" autocomplete="off">
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeEdit()">취소</button>
+      <button class="btn btn-primary" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="backdrop" id="setModal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>설정</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 8px">캘린더에 등록할 <b>알림 시점</b> (오전 9시 기준)</p>
+    <label class="check"><input type="checkbox" id="a30"> 만료 <b>30일</b> 전</label>
+    <label class="check"><input type="checkbox" id="a7">  만료 <b>7일</b> 전</label>
+    <label class="check"><input type="checkbox" id="a1">  만료 <b>1일</b> 전</label>
+    <div class="divider"></div>
+    <label class="check"><input type="checkbox" id="aYearly"> 캘린더 일정을 <b>매년 반복</b>으로 등록</label>
+    <div style="font-size:11.5px;color:var(--muted);word-break:keep-all">렌터카는 매년 검사 대상이라 반복 등록이 편하지만, 실제 검사일에 따라 만료일이 조금씩 달라질 수 있습니다.</div>
+    <div class="divider"></div>
+    <div id="storeInfo" style="font-size:12.5px;color:var(--muted);word-break:keep-all"></div>
+    <div class="modal-acts">
+      <button class="btn btn-ghost btn-sm" onclick="exportJSON()">데이터 백업</button>
+      <button class="btn btn-ghost btn-sm" onclick="importJSON()">백업 복원</button>
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-primary" onclick="closeSettings()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   [설정 1] 공유(클라우드) 모드 — Supabase
+   아래 두 줄에 값을 넣으면 링크에 접속한 모든 사람이
+   같은 목록을 보고 함께 수정합니다.
+   비워 두면 접속한 기기에만 저장되는 '로컬 모드'로 동작합니다.
+   설정 방법은 함께 드린 안내서(SETUP.md)를 참고하세요.
+   ============================================================ */
+const SUPABASE_URL      = "https://tgrspiwnuxhmkstaukjf.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRncnNwaXdudXhobWtzdGF1a2pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNTUxMzgsImV4cCI6MjEwMjYzMTEzOH0.Vv3oUYOTdAApDtacnXvu2d2QBsSrkkrrZqZul_suQfw";
+const TABLE             = "vehicles";
+
+/* ============================================================ */
+
+const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+const LS_DATA = 'carInspection.v2';
+const LS_OPT  = 'carInspection.opt';
+const LS_DONE = 'carInspection.done';   // 캘린더 등록 여부는 기기별로 보관
+
+let DATA = [];
+let FILTER = 'all';
+let OPT = { a30:true, a7:true, a1:false, yearly:false };
+
+/* ---------- 유틸 ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 2600);
+}
+function todayLocal(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function parseDate(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||'').trim());
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+function daysLeft(s){
+  const d = parseDate(s); if(!d) return null;
+  return Math.round((d - todayLocal()) / 86400000);
+}
+function fmtDate(s){
+  const d = parseDate(s); if(!d) return s || '-';
+  const w = ['일','월','화','수','목','금','토'][d.getDay()];
+  return `${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2,'0')}. ${String(d.getDate()).padStart(2,'0')} (${w})`;
+}
+function statusOf(v){
+  const n = daysLeft(v.due_date);
+  if(n === null) return 'none';
+  if(n < 0) return 'over';
+  if(n <= 30) return 'soon';
+  return 'ok';
+}
+function doneKey(v){ return v.id + '|' + v.due_date; }
+function doneSet(){ try{ return new Set(JSON.parse(localStorage.getItem(LS_DONE)||'[]')); }catch(e){ return new Set(); } }
+function markDone(v){ const s = doneSet(); s.add(doneKey(v)); localStorage.setItem(LS_DONE, JSON.stringify([...s])); }
+
+/* ---------- 저장소 (클라우드 / 로컬 공용) ---------- */
+// 새 방식 키(sb_publishable_...)는 Authorization 헤더에 넣으면 거부됩니다.
+// 예전 방식 anon 키(eyJ...)만 Bearer로 함께 보냅니다.
+const IS_JWT_KEY = /^eyJ/.test(SUPABASE_ANON_KEY);
+
+async function api(path, opts={}){
+  const res = await fetch(`${String(SUPABASE_URL).replace(/\/+$/,'')}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      ...(IS_JWT_KEY ? { Authorization: `Bearer ${SUPABASE_ANON_KEY}` } : {}),
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(opts.headers||{})
+    }
+  });
+  if(!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.status === 204 ? null : res.json();
+}
+
+const Store = {
+  async list(){
+    if(CLOUD) return await api(`${TABLE}?select=*&order=due_date.asc`);
+    return localList();
+  },
+  async add(v){
+    if(CLOUD){ const r = await api(TABLE, {method:'POST', body: JSON.stringify([v])}); return r[0]; }
+    v.id = v.id || uid(); const a = localList(); a.push(v); localSave(a); return v;
+  },
+  async update(id, patch){
+    if(CLOUD){ const r = await api(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', body: JSON.stringify(patch)}); return r[0]; }
+    const a = localList(); const i = a.findIndex(x=>x.id===id);
+    if(i>=0){ a[i] = {...a[i], ...patch}; localSave(a); return a[i]; }
+  },
+  async remove(id){
+    if(CLOUD){ await api(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'}); return; }
+    localSave(localList().filter(x=>x.id!==id));
+  },
+  async replaceAll(rows){
+    if(CLOUD){
+      for(const r of await Store.list()) await Store.remove(r.id);
+      for(const r of rows){ const {id, ...rest} = r; await Store.add(rest); }
+      return;
+    }
+    localSave(rows.map(r => ({...r, id: r.id || uid()})));
+  }
+};
+
+function localList(){
+  try{
+    const raw = localStorage.getItem(LS_DATA);
+    if(raw) return JSON.parse(raw);
+    // 이전 버전(v1) 데이터 이관
+    const old = localStorage.getItem('carInspectionData');
+    if(old){
+      const rows = JSON.parse(old).map(o => ({
+        id: uid(), plate:'', name: o.carName || '', kind: o.inspectionType || '정기검사',
+        due_date: /^\d{4}-\d{2}-\d{2}$/.test(o.date||'') ? o.date : '', memo:''
+      }));
+      localSave(rows);
+      return rows;
+    }
+  }catch(e){}
+  return [];
+}
+function localSave(a){ localStorage.setItem(LS_DATA, JSON.stringify(a)); }
+
+/* ---------- 렌더 ---------- */
+function setFilter(f){ FILTER = f; render(); }
+
+function render(){
+  document.querySelectorAll('.stat').forEach(el => el.classList.toggle('active', el.dataset.f === FILTER));
+
+  const rows = [...DATA].sort((a,b) => String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')));
+  $('cOver').textContent = rows.filter(v=>statusOf(v)==='over').length;
+  $('cSoon').textContent = rows.filter(v=>statusOf(v)==='soon').length;
+  $('cAll').textContent  = rows.length;
+
+  const q = $('q').value.trim().toLowerCase();
+  const view = rows.filter(v => {
+    if(FILTER !== 'all' && statusOf(v) !== FILTER) return false;
+    if(!q) return true;
+    return [v.plate, v.name, v.kind, v.memo].some(x => String(x||'').toLowerCase().includes(q));
+  });
+
+  const done = doneSet();
+  const list = $('list');
+
+  if(!view.length){
+    list.innerHTML = `<div class="empty">${rows.length ? '조건에 맞는 차량이 없습니다.' : '등록된 차량이 없습니다.<br>「+ 차량 추가」로 시작하세요.'}</div>`;
+    return;
+  }
+
+  list.innerHTML = view.map(v => {
+    const st = statusOf(v), n = daysLeft(v.due_date);
+    const dd = n === null ? '–' : (n === 0 ? 'D-DAY' : (n > 0 ? 'D-'+n : 'D+'+Math.abs(n)));
+    const sub = n === null ? '날짜 없음' : (n < 0 ? '기한 초과' : (n <= 30 ? '검사 임박' : '여유'));
+    const isDone = done.has(doneKey(v));
+    return `
+    <div class="row s-${st}">
+      <div class="main">
+        <div class="plate">${esc(v.plate) || '<span style="color:var(--muted)">번호 미입력</span>'}<span class="alias">${esc(v.name)}</span></div>
+        <div class="meta"><span class="tag">${esc(v.kind||'정기검사')}</span><span>만료 ${fmtDate(v.due_date)}</span></div>
+        ${v.memo ? `<div class="memo">${esc(v.memo)}</div>` : ''}
+      </div>
+      <div class="dday">${dd}<small>${sub}</small></div>
+      <div class="acts">
+        ${isDone ? '<span class="added" title="이 기기에서 캘린더로 내보냈습니다">✅ 등록됨</span>' : ''}
+        <span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm" onclick="downloadICS('${v.id}')" title="알림이 포함된 .ics 파일 내려받기">📅 .ics</button>
+        <button class="btn btn-ghost btn-sm" onclick="googleCal('${v.id}')" title="구글 캘린더에 바로 추가">구글</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEdit('${v.id}')">수정</button>
+        <button class="btn btn-danger btn-sm" onclick="removeRow('${v.id}')">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- 추가 / 수정 / 삭제 ---------- */
+function openEdit(id){
+  const v = id ? DATA.find(x=>x.id===id) : null;
+  $('editTitle').textContent = v ? '차량 수정' : '차량 추가';
+  $('fId').value  = v ? v.id : '';
+  $('fPlate').value = v ? (v.plate||'') : '';
+  $('fName').value  = v ? (v.name||'')  : '';
+  $('fKind').value  = v ? (v.kind||'정기검사') : '정기검사';
+  $('fDue').value   = v ? (v.due_date||'') : '';
+  $('fMemo').value  = v ? (v.memo||'')  : '';
+  $('editModal').classList.add('on');
+  setTimeout(()=>$('fPlate').focus(), 50);
+}
+function closeEdit(){ $('editModal').classList.remove('on'); }
+
+// 검사 완료 후 다음 만료일 계산 (years=0 이면 오늘)
+function shiftDue(years){
+  const base = parseDate($('fDue').value) || todayLocal();
+  const d = years === 0 ? todayLocal() : new Date(base.getFullYear() + years, base.getMonth(), base.getDate());
+  $('fDue').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function saveEdit(){
+  const plate = $('fPlate').value.trim();
+  const due   = $('fDue').value.trim();
+  if(!plate && !$('fName').value.trim()) return toast('차량번호 또는 팀명을 입력하세요.');
+  if(!due) return toast('검사 만료일을 입력하세요.');
+
+  const payload = {
+    plate, name: $('fName').value.trim(), kind: $('fKind').value,
+    due_date: due, memo: $('fMemo').value.trim()
+  };
+  const id = $('fId').value;
+  try{
+    if(id) await Store.update(id, payload);
+    else   await Store.add(payload);
+    closeEdit();
+    await reload();
+    toast(id ? '수정했습니다.' : '추가했습니다.');
+  }catch(e){ toast('저장 실패: ' + e.message); }
+}
+
+async function removeRow(id){
+  const v = DATA.find(x=>x.id===id);
+  if(!confirm(`「${v?.plate || v?.name || '이 차량'}」을(를) 삭제할까요?`)) return;
+  try{ await Store.remove(id); await reload(); toast('삭제했습니다.'); }
+  catch(e){ toast('삭제 실패: ' + e.message); }
+}
+
+/* ---------- 캘린더(ICS) ---------- */
+function icsEsc(s){ return String(s??'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n'); }
+function fold(line){
+  const enc = new TextEncoder();
+  if(enc.encode(line).length <= 73) return line;
+  const out = []; let cur = '', len = 0;
+  for(const ch of line){
+    const l = enc.encode(ch).length;
+    if(len + l > 73){ out.push(cur); cur = ' '; len = 1; }
+    cur += ch; len += l;
+  }
+  out.push(cur);
+  return out.join('\r\n');
+}
+function ymd(d){ return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; }
+function nextDay(d){ const x = new Date(d); x.setDate(x.getDate()+1); return x; }
+
+function alarms(){
+  // 종일 일정의 시작(자정) 기준 역산 → 해당 일자 오전 9시에 알림
+  const set = [];
+  if(OPT.a30) set.push(['-P29DT15H','검사 만료 30일 전']);
+  if(OPT.a7)  set.push(['-P6DT15H','검사 만료 7일 전']);
+  if(OPT.a1)  set.push(['-PT15H','검사 만료 1일 전']);
+  return set;
+}
+
+function vevent(v){
+  const d = parseDate(v.due_date);
+  if(!d) return null;
+  const title = `[${v.plate || v.name || '차량'}] ${v.kind || '정기검사'} 만료`;
+  const desc  = `${[v.plate, v.name].filter(Boolean).join(' / ')} 차량의 ${v.kind || '정기검사'} 유효기간 만료일입니다.\n`
+              + `검사 가능 기간: ${fmtDate(v.due_date)} 전후 31일 이내`
+              + (v.memo ? `\n메모: ${v.memo}` : '');
+  const L = [
+    'BEGIN:VEVENT',
+    `UID:${v.id}-${v.due_date}@car-inspection`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z`,
+    `DTSTART;VALUE=DATE:${ymd(d)}`,
+    `DTEND;VALUE=DATE:${ymd(nextDay(d))}`,
+    `SUMMARY:${icsEsc(title)}`,
+    `DESCRIPTION:${icsEsc(desc)}`,
+    'TRANSP:TRANSPARENT'
+  ];
+  if(OPT.yearly) L.push('RRULE:FREQ=YEARLY');
+  for(const [trig, label] of alarms()){
+    L.push('BEGIN:VALARM', `TRIGGER;RELATED=START:${trig}`, 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(label + ' — ' + title)}`, 'END:VALARM');
+  }
+  L.push('END:VEVENT');
+  return L;
+}
+
+function buildICS(rows){
+  const L = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Car Inspection Tracker//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
+  let n = 0;
+  for(const v of rows){ const e = vevent(v); if(e){ L.push(...e); n++; } }
+  L.push('END:VCALENDAR');
+  return { text: L.map(fold).join('\r\n') + '\r\n', count: n };
+}
+
+function saveFile(text, filename){
+  const blob = new Blob([text], {type:'text/calendar;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 4000);
+}
+
+function downloadICS(id){
+  const v = DATA.find(x=>x.id===id); if(!v) return;
+  if(!parseDate(v.due_date)) return toast('만료일이 올바르지 않습니다.');
+  if(!alarms().length) return toast('설정(⚙)에서 알림 시점을 하나 이상 선택하세요.');
+  const { text } = buildICS([v]);
+  // 일부 브라우저(특히 iOS)에서 한글 파일명이 잘려 저장되므로 ASCII 파일명 사용
+  const slug = String(v.plate || v.name || '').replace(/[^0-9A-Za-z]/g, '');
+  saveFile(text, `car-inspection-${slug ? slug + '-' : ''}${v.due_date}.ics`);
+  markDone(v); render();
+  toast('다운로드된 .ics 파일을 열면 캘린더에 등록됩니다.');
+}
+
+function exportAllICS(){
+  if(!DATA.length) return toast('등록된 차량이 없습니다.');
+  if(!alarms().length) return toast('설정(⚙)에서 알림 시점을 하나 이상 선택하세요.');
+  const { text, count } = buildICS(DATA);
+  if(!count) return toast('만료일이 입력된 차량이 없습니다.');
+  saveFile(text, 'car-inspection-all.ics');
+  DATA.forEach(v => { if(parseDate(v.due_date)) markDone(v); });
+  render();
+  toast(`${count}건을 하나의 파일로 내보냈습니다.`);
+}
+
+function googleCal(id){
+  const v = DATA.find(x=>x.id===id); if(!v) return;
+  const d = parseDate(v.due_date); if(!d) return toast('만료일이 올바르지 않습니다.');
+  const title = `[${v.plate || v.name || '차량'}] ${v.kind || '정기검사'} 만료`;
+  const details = `검사 가능 기간: ${fmtDate(v.due_date)} 전후 31일 이내` + (v.memo ? `\n메모: ${v.memo}` : '');
+  const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + `&text=${encodeURIComponent(title)}`
+    + `&dates=${ymd(d)}/${ymd(nextDay(d))}`
+    + `&details=${encodeURIComponent(details)}`
+    + (OPT.yearly ? '&recur=RRULE:FREQ=YEARLY' : '');
+  window.open(url, '_blank', 'noopener');
+  markDone(v); render();
+}
+
+/* ---------- 설정 ---------- */
+function openSettings(){
+  $('a30').checked = OPT.a30; $('a7').checked = OPT.a7;
+  $('a1').checked = OPT.a1;   $('aYearly').checked = OPT.yearly;
+  $('storeInfo').innerHTML = CLOUD
+    ? '저장 위치: <b>공유 서버(Supabase)</b> — 링크에 접속한 모두가 같은 목록을 봅니다.'
+    : '저장 위치: <b>이 기기</b> — 다른 사람/기기와 공유되지 않습니다. 공유하려면 안내서를 참고해 Supabase를 연결하세요.';
+  $('setModal').classList.add('on');
+}
+function closeSettings(){
+  OPT = { a30:$('a30').checked, a7:$('a7').checked, a1:$('a1').checked, yearly:$('aYearly').checked };
+  localStorage.setItem(LS_OPT, JSON.stringify(OPT));
+  $('setModal').classList.remove('on');
+}
+
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `car-inspection-backup-${ymd(new Date())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function importJSON(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json,.json';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if(!f) return;
+    try{
+      const rows = JSON.parse(await f.text());
+      if(!Array.isArray(rows)) throw new Error('형식이 올바르지 않습니다.');
+      if(!confirm(`현재 목록을 백업 파일의 ${rows.length}건으로 교체합니다. 계속할까요?`)) return;
+      await Store.replaceAll(rows);
+      await reload(); toast('복원했습니다.');
+    }catch(e){ toast('복원 실패: ' + e.message); }
+  };
+  inp.click();
+}
+
+/* ---------- 시작 ---------- */
+async function reload(){
+  try{
+    DATA = await Store.list();
+    if(CLOUD) $('notice').style.display = 'none';
+  }catch(e){
+    DATA = [];
+    $('notice').style.display = 'block';
+    $('notice').innerHTML = `<b>공유 서버에 연결하지 못했습니다.</b> 설정값(URL·KEY)과 테이블 권한을 확인하세요.<br><span style="font-size:11.5px">${esc(e.message).slice(0,200)}</span>`;
+  }
+  render();
+}
+
+(function init(){
+  try{ OPT = {...OPT, ...JSON.parse(localStorage.getItem(LS_OPT) || '{}')}; }catch(e){}
+
+  const b = $('modeBadge');
+  b.className = 'mode ' + (CLOUD ? 'cloud' : 'local');
+  b.textContent = CLOUD ? '공유 모드' : '로컬 모드';
+
+  if(!CLOUD){
+    $('notice').style.display = 'block';
+    $('notice').innerHTML = '<b>로컬 모드로 실행 중입니다.</b> 데이터가 지금 사용하는 기기에만 저장되어 다른 사람과 공유되지 않습니다. ' +
+      '함께 드린 안내서에 따라 파일 상단의 <code>SUPABASE_URL</code>·<code>SUPABASE_ANON_KEY</code>를 채우면 공유 모드로 전환됩니다.';
+  }
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){ closeEdit(); $('setModal').classList.remove('on'); }
+  });
+
+  reload();
+})();
+</script>
+</body>
+</html>
