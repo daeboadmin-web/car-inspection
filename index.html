@@ -190,11 +190,6 @@
   .guide ul{margin:0 0 20px;padding-left:16px;font-size:12.5px;line-height:1.85;font-weight:400}
   .guide li{margin-bottom:5px}
 
-  .foot{padding:22px 0 4px;font-size:11.5px;color:var(--muted);text-align:center;
-        line-height:1.9;font-weight:400}
-  .foot b{color:var(--muted);font-weight:600}
-  .foot a{text-decoration:none;font-weight:600;color:var(--muted)}
-  .foot a:hover{color:var(--brand)}
 
   /* ---------- 모달 ---------- */
   .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(2px);
@@ -312,10 +307,6 @@
   </details>
   </div>
 
-  <div class="foot">
-    문의 · <b>영남사업단 김동욱 과장</b><br>
-    <a href="tel:01034558203">010-3455-8203</a>
-  </div>
 </div>
 
 <!-- 차량 추가 / 수정 -->
@@ -394,17 +385,17 @@
     </div>
 
     <div class="warnbox" id="alInapp" style="display:none">
-      <div class="t">여기서는 일정 저장이 안 됩니다</div>
+      <div class="t">여기서는 연결되지 않습니다</div>
       <p id="alInappDesc"></p>
       <div class="btns">
-        <button class="go" onclick="openExternal()">브라우저로 열기</button>
+        <button class="go" onclick="openInBrowser()">브라우저로 열기</button>
         <button class="cp" onclick="copyLink()">주소 복사</button>
       </div>
     </div>
 
     <button class="opt primary" onclick="alarmIcs()">
       <b>휴대폰 캘린더에 저장</b>
-      <small>알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.</small>
+      <small>날짜 · 알림이 설정된 파일이 다운로드됩니다. 캘린더에 등록만 하시면 됩니다.</small>
     </button>
     <button class="opt" onclick="alarmGoogle()">
       <b>구글 캘린더에 저장</b>
@@ -812,27 +803,18 @@ function openExternal(silent, targetUrl){
   if(!silent) copyLink('주소를 복사했습니다. 사파리에 붙여넣어 주세요.');
 }
 
-/* 막힌 환경이면 말없이 브라우저로 넘겨보고,
-   1.8초 뒤에도 그대로 있으면 그때 안내를 띄웁니다. */
-function jumpToBrowser(app){
-  let left = false;
-  const mark = () => { left = true; };
-  document.addEventListener('visibilitychange', mark);
-  window.addEventListener('pagehide', mark);
+/* 막힌 환경이면 바로 넘기지 않고, 먼저 알려주고 사용자가 고르게 합니다. */
+function askToJump(){
+  $('alInappDesc').innerHTML = '그룹웨어 · 카카오톡 등 앱 안에서는 저장되지 않습니다.<br>다른 브라우저로 연결합니다.';
+  $('alInapp').style.display = 'block';
+  $('alInapp').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
 
-  toast('브라우저로 넘어갑니다…');
-  // 넘어간 브라우저에서 바로 이 차량 창이 열리도록 표시를 붙입니다
-  openExternal(true, location.href.split('#')[0] + '#v=' + encodeURIComponent(ALARM_ID || ''));
-
-  setTimeout(() => {
-    document.removeEventListener('visibilitychange', mark);
-    window.removeEventListener('pagehide', mark);
-    if(left || document.hidden) return;          // 전환 성공
-    $('alInappDesc').innerHTML = `<b>${esc(app)}</b> 안에서 열려 있어서 그렇습니다.<br>`
-      + (isIOSDev() ? '아래 버튼으로 사파리에서 열어주세요.' : '아래 버튼으로 브라우저에서 열어주세요.');
-    $('alInapp').style.display = 'block';
-    $('alInapp').scrollIntoView({behavior:'smooth', block:'nearest'});
-  }, 1800);
+// 넘어간 브라우저에서 바로 이 차량 창이 열리도록 표시를 붙여 이동합니다
+function openInBrowser(){
+  toast('브라우저로 연결합니다…');
+  openExternal(false, location.href.split('#')[0]
+    + (ALARM_ID ? '#v=' + encodeURIComponent(ALARM_ID) : ''));
 }
 
 async function copyLink(msg){
@@ -930,10 +912,9 @@ async function alarmIcs(){
   if(!alarms().length) return toast('위에서 알림 시점을 하나 이상 골라주세요.');
 
   // 저장이 막힌 환경(카톡 · 메일 앱 등)이면 말없이 브라우저로 넘깁니다
-  const app = inAppName();
-  if(app){
+  if(inAppName()){
     $('alSteps').classList.remove('on');
-    jumpToBrowser(app);
+    askToJump();
     return;
   }
 
