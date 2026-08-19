@@ -392,62 +392,6 @@
   </div>
 </div>
 
-<!-- 알림 받기 -->
-<div class="backdrop" id="alarmModal" onclick="if(event.target===this)closeAlarm()">
-  <div class="modal" role="dialog" aria-modal="true">
-    <h3>검사 알림 받기</h3>
-
-    <div class="al-head">
-      <b id="alTitle"></b>
-      <span id="alSub"></span>
-    </div>
-
-    <div class="al-label">알림 시점 <span style="font-weight:500">(오전 9시)</span></div>
-    <div class="chips">
-      <button class="chip" id="ch30" onclick="toggleChip('a30')">30일 전</button>
-      <button class="chip" id="ch7"  onclick="toggleChip('a7')">7일 전</button>
-      <button class="chip" id="ch1"  onclick="toggleChip('a1')">1일 전</button>
-    </div>
-    <div class="al-when"><span>🔔</span><span id="alWhen"></span></div>
-    <div class="al-note">
-      여기서 바꾼 시점은 <b>이 차량을 저장할 때만</b> 적용되고 전체 설정은 그대로입니다.
-      <a href="#" id="alSaveDefault" onclick="event.preventDefault();saveAlarmDefault()">기본값으로 저장</a>
-    </div>
-
-    <div class="warnbox" id="alInapp" style="display:none">
-      <div class="t">지금은 파일 저장이 되지 않습니다</div>
-      <p><b id="alInappName">이 앱</b> 안에서 열려 있습니다. 여기서는 파일 저장이
-         <b>0%에서 멈추거나</b> 받아도 사라질 수 있습니다.
-         잘 안 되면 아래로 브라우저(크롬 · 사파리)를 연 다음 다시 시도하세요.
-         <br>아래 <b>구글 캘린더에 저장</b>은 여기서도 됩니다.</p>
-      <div class="btns">
-        <button class="go" onclick="openExternal()">브라우저로 열기</button>
-        <button class="cp" onclick="copyLink()">주소 복사</button>
-      </div>
-    </div>
-
-    <div class="opts">
-      <button class="opt primary" id="optIcs" onclick="alarmIcs()">
-        <b>휴대폰 캘린더에 저장<span class="tag no" id="tagIcs" style="display:none">지금 안 됨</span></b>
-        <small id="optIcsDesc">알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.</small>
-      </button>
-      <button class="opt" id="optGoogle" onclick="alarmGoogle()">
-        <b>구글 캘린더에 저장<span class="tag now" id="tagGoogle" style="display:none">지금 됨</span></b>
-        <small id="optGoogleDesc">PC에서 쓰기 편합니다. 알림은 구글 캘린더에서 직접 설정하세요.</small>
-      </button>
-    </div>
-
-    <div class="steps" id="alSteps">
-      <div class="t" id="alStepTitle">파일을 받았습니다 · 마지막 단계</div>
-      <ol id="alStepList"></ol>
-    </div>
-
-    <div class="m-acts">
-      <button onclick="closeAlarm()">닫기</button>
-    </div>
-  </div>
-</div>
-
 <!-- 설정 -->
 <div class="backdrop" id="setModal" onclick="if(event.target===this)closeSettings()">
   <div class="modal" role="dialog" aria-modal="true">
@@ -459,16 +403,10 @@
 
     <div class="hr"></div>
 
-    <div class="sect">캘린더 알림 시점 <span style="font-weight:600">(오전 9시)</span></div>
-    <label class="check"><input type="checkbox" id="a30"> 만료 <b>30일</b> 전</label>
-    <label class="check"><input type="checkbox" id="a7">  만료 <b>7일</b> 전</label>
-    <label class="check"><input type="checkbox" id="a1">  만료 <b>1일</b> 전</label>
-
-    <div class="hr"></div>
-
-    <label class="check"><input type="checkbox" id="aYearly"> 캘린더 일정을 <b>매년 반복</b>으로 등록</label>
-    <div style="font-size:11.5px;color:var(--muted);word-break:keep-all;line-height:1.7">
-      사업용 차량은 매년 검사라 반복 등록이 편하지만, 실제 검사일에 따라 만료일이 조금씩 달라질 수 있습니다.
+    <div class="sect">검사 알림</div>
+    <div style="font-size:12.5px;color:var(--ink2);word-break:keep-all;line-height:1.75">
+      검사가 임박한 차량은 <b>매일 아침 담당자 메일로 자동 발송</b>됩니다.
+      따로 등록하실 것은 없습니다.
     </div>
 
     <div class="hr"></div>
@@ -636,7 +574,7 @@ function render(){
       <div class="dday"><b>${dd}</b><small>${sub}</small></div>
       <div class="acts">
         <span class="sp"></span>
-        <button class="bell" onclick="openAlarm('${v.id}')">🔔 알림 받기</button>
+        <button class="bell" onclick="googleCal('${v.id}')">📅 캘린더 추가</button>
         <button class="act" onclick="openEdit('${v.id}')"><b>수정</b></button>
         <button class="act warnact" onclick="removeRow('${v.id}')"><b>삭제</b></button>
       </div>
@@ -694,97 +632,14 @@ async function removeRow(id){
 }
 
 /* ---------- 캘린더 ---------- */
-function icsEsc(s){ return String(s??'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n'); }
-function fold(line){
-  const enc = new TextEncoder();
-  if(enc.encode(line).length <= 73) return line;
-  const out=[]; let cur='', len=0;
-  for(const ch of line){
-    const l = enc.encode(ch).length;
-    if(len + l > 73){ out.push(cur); cur=' '; len=1; }
-    cur += ch; len += l;
-  }
-  out.push(cur); return out.join('\r\n');
-}
 function ymd(d){ return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; }
 function nextDay(d){ const x=new Date(d); x.setDate(x.getDate()+1); return x; }
 
-function alarms(){
-  const o = effOpt(), set = [];
-  if(o.a30) set.push(['-P29DT15H','검사 만료 30일 전']);
-  if(o.a7)  set.push(['-P6DT15H','검사 만료 7일 전']);
-  if(o.a1)  set.push(['-PT15H','검사 만료 1일 전']);
-  return set;
-}
 
-function vevent(v){
-  const d = parseDate(v.due_date); if(!d) return null;
-  const title = `[${v.plate || v.name || '차량'}] ${v.kind || '정기검사'} 만료`;
-  const desc  = `${[v.plate, v.name].filter(Boolean).join(' / ')} 차량의 ${v.kind || '정기검사'} 유효기간 만료일입니다.\n`
-              + `검사 가능 기간: ${fmtDate(v.due_date)} 전후 31일 이내`
-              + (v.memo ? `\n메모: ${v.memo}` : '');
-  const L = ['BEGIN:VEVENT', `UID:${v.id}-${v.due_date}@car-inspection`,
-    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z`,
-    `DTSTART;VALUE=DATE:${ymd(d)}`, `DTEND;VALUE=DATE:${ymd(nextDay(d))}`,
-    `SUMMARY:${icsEsc(title)}`, `DESCRIPTION:${icsEsc(desc)}`, 'TRANSP:TRANSPARENT'];
-  if(OPT.yearly) L.push('RRULE:FREQ=YEARLY');
-  for(const [trig,label] of alarms()){
-    L.push('BEGIN:VALARM', `TRIGGER;RELATED=START:${trig}`, 'ACTION:DISPLAY',
-           `DESCRIPTION:${icsEsc(label + ' — ' + title)}`, 'END:VALARM');
-  }
-  L.push('END:VEVENT');
-  return L;
-}
 
-function buildICS(rows){
-  const L = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Car Inspection Tracker//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
-  let n = 0;
-  for(const v of rows){ const e = vevent(v); if(e){ L.push(...e); n++; } }
-  L.push('END:VCALENDAR');
-  return { text: L.map(fold).join('\r\n') + '\r\n', count: n };
-}
 
-function b64utf8(str){
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  bytes.forEach(b => bin += String.fromCharCode(b));
-  return btoa(bin);
-}
 
-function anchorDownload(href, filename){
-  const a = document.createElement('a');
-  a.href = href; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
-  document.body.appendChild(a); a.click();
-  setTimeout(()=>a.remove(), 4000);
-}
 
-/* 파일 저장 — 환경마다 되는 방법이 달라 순서대로 시도합니다.
-   1) 공유 시트: 휴대폰에서 가장 확실. 캘린더 앱으로 바로 보낼 수 있습니다.
-   2) data: URL: blob: 이 막힌 앱 내 브라우저에서도 대체로 동작합니다.
-   3) blob: URL: 위 둘이 안 될 때의 마지막 수단.
-   반환값 — 'share' | 'download' | 'cancel'                                   */
-async function saveFile(text, filename){
-  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(mobile && navigator.canShare){
-    try{
-      const file = new File([text], filename, { type:'text/calendar' });
-      if(navigator.canShare({ files:[file] })){
-        await navigator.share({ files:[file], title:'자동차검사 알림' });
-        return 'share';
-      }
-    }catch(e){
-      if(e && e.name === 'AbortError') return 'cancel';   // 사용자가 공유를 취소
-    }
-  }
-  try{
-    anchorDownload('data:text/calendar;charset=utf-8;base64,' + b64utf8(text), filename);
-  }catch(e){
-    const url = URL.createObjectURL(new Blob([text], {type:'text/calendar;charset=utf-8'}));
-    anchorDownload(url, filename);
-    setTimeout(()=>URL.revokeObjectURL(url), 8000);
-  }
-  return 'download';
-}
 
 /* ---------- 인앱 브라우저 ----------
    카카오톡·네이버 등 앱 안에 내장된 브라우저는 파일 저장이 막혀 있습니다.
@@ -858,112 +713,10 @@ async function copyLink(msg){
 }
 
 // 내려받은 뒤 실제로 캘린더에 넣는 방법은 기기마다 다릅니다
-function shareSteps(){
-  return ['공유 목록에서 <b>캘린더</b> 앱을 고릅니다 <span style="color:var(--muted)">(안드로이드는 「Google 캘린더」)</span>',
-          '열리는 화면에서 <b>「추가」</b> 또는 <b>「모두 추가」</b>를 누릅니다',
-          '목록에 안 보이면 <b>「파일에 저장」</b> 후 그 파일을 눌러도 됩니다'];
-}
 
-function icsSteps(){
-  const ua = navigator.userAgent;
-  const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  if(iOS) return ['화면 오른쪽 위 <b>다운로드(↓)</b> 아이콘을 누릅니다',
-                  '방금 받은 파일을 누릅니다 <span style="color:var(--muted)">(안 보이면 「파일」 앱 → 다운로드)</span>',
-                  '<b>「모두 추가」</b>를 누르고 캘린더를 고릅니다'];
-  if(/Android/.test(ua)) return ['화면 위 <b>다운로드 완료 알림</b>을 누릅니다',
-                  '<b>Google 캘린더</b>를 선택합니다',
-                  '<b>「추가」</b>를 누릅니다'];
-  return ['내려받은 파일을 <b>더블클릭</b>합니다',
-          '캘린더 앱(Outlook 등)이 열리면 <b>저장</b>합니다',
-          '구글 캘린더를 쓰신다면 위의 <b>「구글 캘린더에 저장」</b>이 더 편합니다'];
-}
 
-// 팝업에서만 쓰는 임시 알림 시점 — 열려 있는 동안에만 전역 설정을 대신합니다
-let ALARM_OPT = null;
-function effOpt(){ return ALARM_OPT || OPT; }
 
-// 알림 시점을 사람이 읽는 문장으로
-function alarmSentence(){
-  const o = effOpt(), on = [];
-  if(o.a30) on.push('30일');
-  if(o.a7)  on.push('7일');
-  if(o.a1)  on.push('1일');
-  if(!on.length) return '<b style="color:var(--warn)">알림 시점을 하나 이상 골라주세요.</b> 지금 저장하면 알림이 울리지 않습니다.';
-  return `만료 <b>${on.join(' 전 · ')} 전</b> 오전 9시에 휴대폰이 알려줍니다.`;
-}
 
-function paintChips(){
-  const o = effOpt();
-  $('ch30').classList.toggle('on', !!o.a30);
-  $('ch7').classList.toggle('on',  !!o.a7);
-  $('ch1').classList.toggle('on',  !!o.a1);
-  $('alWhen').innerHTML = alarmSentence();
-  const same = ['a30','a7','a1'].every(k => !!o[k] === !!OPT[k]);
-  $('alSaveDefault').style.display = same ? 'none' : 'inline';
-}
-function toggleChip(k){
-  if(!ALARM_OPT) ALARM_OPT = { a30:OPT.a30, a7:OPT.a7, a1:OPT.a1 };
-  ALARM_OPT[k] = !ALARM_OPT[k];
-  paintChips();
-  $('alSteps').classList.remove('on');   // 시점이 바뀌었으니 다시 저장해야 함
-}
-function saveAlarmDefault(){
-  if(!ALARM_OPT) return;
-  OPT = { ...OPT, a30:ALARM_OPT.a30, a7:ALARM_OPT.a7, a1:ALARM_OPT.a1 };
-  localStorage.setItem(LS_OPT, JSON.stringify(OPT));
-  paintChips();
-  toast('앞으로 이 시점이 기본값으로 쓰입니다.');
-}
-
-let ALARM_ID = null;
-
-function openAlarm(id){
-  const v = DATA.find(x=>x.id===id); if(!v) return;
-  ALARM_ID = id;
-  ALARM_OPT = null;                       // 열 때마다 전체 설정값으로 되돌립니다
-  $('alTitle').textContent = (v.plate || '번호 미입력') + (v.name ? `   ·   ${v.name}` : '');
-  $('alSub').textContent   = `${v.kind || '정기검사'} 만료 ${fmtDate(v.due_date)}`;
-  paintChips();
-  const app = inAppName();
-  $('alInapp').style.display = app ? 'block' : 'none';
-  if(app) $('alInappName').textContent = app;
-  // 앱 내 브라우저에서는 파일 저장이 막히므로 구글 쪽을 위로 올려 권합니다
-  $('optGoogle').style.order = app ? '0' : '1';
-  $('optIcs').style.order    = app ? '1' : '0';
-  $('optGoogle').classList.toggle('primary', !!app);
-  $('optIcs').classList.toggle('primary', !app);
-  $('tagGoogle').style.display = app ? 'inline-block' : 'none';
-  $('tagIcs').style.display    = app ? 'inline-block' : 'none';
-  $('optGoogleDesc').textContent = app
-    ? '이 화면에서 바로 등록됩니다. 알림은 구글 캘린더에서 직접 설정하세요.'
-    : 'PC에서 쓰기 편합니다. 알림은 구글 캘린더에서 직접 설정하세요.';
-  $('optIcsDesc').textContent = app
-    ? '알림이 자동으로 들어가지만, 이 앱 안에서는 저장이 되지 않습니다. 브라우저로 열고 쓰세요.'
-    : '알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.';
-  $('alSteps').classList.remove('on');
-  $('alarmModal').classList.add('on');
-}
-function closeAlarm(){ $('alarmModal').classList.remove('on'); ALARM_OPT = null; }
-
-async function alarmIcs(){
-  if(!alarms().length) return toast('위에서 알림 시점을 하나 이상 골라주세요.');
-  const how = await downloadICS(ALARM_ID);
-  if(!how || how === 'cancel') return;
-  $('alStepTitle').textContent = how === 'share' ? '공유 화면이 열렸습니다 · 마지막 단계'
-                                                : '파일을 받았습니다 · 마지막 단계';
-  $('alStepList').innerHTML = (how === 'share' ? shareSteps() : icsSteps())
-                                .map(t => `<li>${t}</li>`).join('');
-  $('alSteps').classList.add('on');
-}
-function alarmGoogle(){ const id = ALARM_ID; googleCal(id); closeAlarm(); }
-
-async function downloadICS(id){
-  const v = DATA.find(x=>x.id===id); if(!v) return null;
-  if(!parseDate(v.due_date)){ toast('만료일이 올바르지 않습니다.'); return null; }
-  if(!alarms().length){ toast('알림 시점을 하나 이상 골라주세요.'); return null; }
-  const slug = String(v.plate || v.name || '').replace(/[^0-9A-Za-z]/g,'');
-  return await saveFile(buildICS([v]).text, `car-inspection-${slug ? slug+'-' : ''}${v.due_date}.ics`);
-}
 
 
 function googleCal(id){
@@ -974,7 +727,7 @@ function googleCal(id){
   const gurl = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
     + `&text=${encodeURIComponent(title)}&dates=${ymd(d)}/${ymd(nextDay(d))}`
     + `&details=${encodeURIComponent(details)}`
-    + (OPT.yearly ? '&recur=RRULE:FREQ=YEARLY' : '');
+    ;
   // 앱 내 브라우저에서는 새 창이 막히는 경우가 많아 같은 화면에서 이동합니다
   if(inAppName()) location.href = gurl;
   else window.open(gurl, '_blank', 'noopener');
@@ -982,8 +735,6 @@ function googleCal(id){
 
 /* ---------- 설정 ---------- */
 function openSettings(){
-  $('a30').checked = OPT.a30; $('a7').checked = OPT.a7;
-  $('a1').checked  = OPT.a1;  $('aYearly').checked = OPT.yearly;
   const t = document.documentElement.dataset.theme;
   document.querySelectorAll('input[name="th"]').forEach(r => r.checked = (r.value === t));
   $('storeInfo').innerHTML = CLOUD
@@ -991,12 +742,7 @@ function openSettings(){
     : '저장 위치 — <b style="color:var(--warn)">이 기기</b>. 다른 사람과 공유되지 않습니다.';
   $('setModal').classList.add('on');
 }
-function closeSettings(){
-  OPT = { a30:$('a30').checked, a7:$('a7').checked, a1:$('a1').checked, yearly:$('aYearly').checked };
-  localStorage.setItem(LS_OPT, JSON.stringify(OPT));
-  $('setModal').classList.remove('on');
-  if($('alarmModal').classList.contains('on')) paintChips();
-}
+function closeSettings(){ $('setModal').classList.remove('on'); }
 
 function exportJSON(){
   const a = document.createElement('a');
@@ -1033,7 +779,6 @@ async function reload(){
 }
 
 (function init(){
-  try{ OPT = {...OPT, ...JSON.parse(localStorage.getItem(LS_OPT) || '{}')}; }catch(e){}
   let t = 'light';
   try{ t = localStorage.getItem(LS_THEME) || 'light'; }catch(e){}
   setTheme(t);
@@ -1042,11 +787,10 @@ async function reload(){
   if(app){
     $('inapp').style.display = 'block';
     $('inappTitle').textContent = `${app} 안에서 열려 있습니다`;
-    $('inappDesc').innerHTML = '이 상태에서는 <b>캘린더 알림 파일이 저장되지 않습니다.</b> '
-      + '다운로드가 0%에서 멈춥니다. 아래 주소를 크롬 · 사파리에서 열어 사용하세요.';
+    $('inappDesc').innerHTML = '앱 안에 내장된 화면이라 일부 기능이 제한될 수 있습니다. '
+      + '아래 주소를 크롬 · 사파리에서 열고 <b>홈 화면에 추가</b>해두면 편합니다.';
     $('inappUrl').textContent = location.href;
-    $('inappManual').innerHTML = manualHint()
-      + '<br>한 번 브라우저로 연 뒤 <b>홈 화면에 추가</b>해두면 다음부터는 이 안내가 나오지 않습니다.';
+    $('inappManual').innerHTML = manualHint();
   }
 
   const b = $('modeBadge');
@@ -1059,7 +803,7 @@ async function reload(){
   }
 
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape'){ closeEdit(); closeAlarm(); $('setModal').classList.remove('on'); }
+    if(e.key === 'Escape'){ closeEdit(); $('setModal').classList.remove('on'); }
   });
 
   reload();
