@@ -404,9 +404,10 @@
 
     <div class="warnbox" id="alInapp" style="display:none">
       <div class="t">지금은 파일 저장이 되지 않습니다</div>
-      <p><b id="alInappName">이 앱</b> 안에서 열려 있어, 파일을 받아도 저장되지 않고 사라집니다.
-         아래로 브라우저를 연 다음 다시 「알림 받기」를 눌러주세요.
-         <br>급하면 아래 <b>구글 캘린더에 저장</b>은 여기서도 됩니다.</p>
+      <p><b id="alInappName">이 앱</b> 안에서 열려 있습니다. 여기서는 파일 저장이
+         <b>0%에서 멈추거나</b> 받아도 사라질 수 있습니다.
+         잘 안 되면 아래로 브라우저(크롬 · 사파리)를 연 다음 다시 시도하세요.
+         <br>아래 <b>구글 캘린더에 저장</b>은 여기서도 됩니다.</p>
       <div class="btns">
         <button class="go" onclick="openExternal()">브라우저로 열기</button>
         <button class="cp" onclick="copyLink()">주소 복사</button>
@@ -423,7 +424,7 @@
     </button>
 
     <div class="steps" id="alSteps">
-      <div class="t">파일을 받았습니다 · 마지막 단계</div>
+      <div class="t" id="alStepTitle">파일을 받았습니다 · 마지막 단계</div>
       <ol id="alStepList"></ol>
     </div>
 
@@ -729,12 +730,46 @@ function buildICS(rows){
   return { text: L.map(fold).join('\r\n') + '\r\n', count: n };
 }
 
-function saveFile(text, filename){
-  const url = URL.createObjectURL(new Blob([text], {type:'text/calendar;charset=utf-8'}));
+function b64utf8(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+}
+
+function anchorDownload(href, filename){
   const a = document.createElement('a');
-  a.href = url; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
+  a.href = href; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
   document.body.appendChild(a); a.click();
-  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 4000);
+  setTimeout(()=>a.remove(), 4000);
+}
+
+/* 파일 저장 — 환경마다 되는 방법이 달라 순서대로 시도합니다.
+   1) 공유 시트: 휴대폰에서 가장 확실. 캘린더 앱으로 바로 보낼 수 있습니다.
+   2) data: URL: blob: 이 막힌 앱 내 브라우저에서도 대체로 동작합니다.
+   3) blob: URL: 위 둘이 안 될 때의 마지막 수단.
+   반환값 — 'share' | 'download' | 'cancel'                                   */
+async function saveFile(text, filename){
+  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(mobile && navigator.canShare){
+    try{
+      const file = new File([text], filename, { type:'text/calendar' });
+      if(navigator.canShare({ files:[file] })){
+        await navigator.share({ files:[file], title:'자동차검사 알림' });
+        return 'share';
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return 'cancel';   // 사용자가 공유를 취소
+    }
+  }
+  try{
+    anchorDownload('data:text/calendar;charset=utf-8;base64,' + b64utf8(text), filename);
+  }catch(e){
+    const url = URL.createObjectURL(new Blob([text], {type:'text/calendar;charset=utf-8'}));
+    anchorDownload(url, filename);
+    setTimeout(()=>URL.revokeObjectURL(url), 8000);
+  }
+  return 'download';
 }
 
 /* ---------- 인앱 브라우저 ----------
@@ -754,6 +789,8 @@ const INAPPS = [
 function inAppName(){
   const ua = navigator.userAgent;
   for(const [re, name] of INAPPS) if(re.test(ua)) return name;
+  // 그룹웨어·메일 등 앱이 띄운 내장 화면(WebView)은 UA에 '; wv)' 가 붙습니다
+  if(/Android/.test(ua) && /;\s*wv\)/.test(ua)) return '앱 내 브라우저';
   return null;
 }
 function isIOSDev(){
@@ -791,6 +828,12 @@ async function copyLink(msg){
 }
 
 // 내려받은 뒤 실제로 캘린더에 넣는 방법은 기기마다 다릅니다
+function shareSteps(){
+  return ['공유 목록에서 <b>캘린더</b> 앱을 고릅니다 <span style="color:var(--muted)">(안드로이드는 「Google 캘린더」)</span>',
+          '열리는 화면에서 <b>「추가」</b> 또는 <b>「모두 추가」</b>를 누릅니다',
+          '목록에 안 보이면 <b>「파일에 저장」</b> 후 그 파일을 눌러도 됩니다'];
+}
+
 function icsSteps(){
   const ua = navigator.userAgent;
   const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
@@ -859,22 +902,24 @@ function openAlarm(id){
 }
 function closeAlarm(){ $('alarmModal').classList.remove('on'); ALARM_OPT = null; }
 
-function alarmIcs(){
+async function alarmIcs(){
   if(!alarms().length) return toast('위에서 알림 시점을 하나 이상 골라주세요.');
-  const app = inAppName();
-  if(app) return toast(`${app} 안에서는 저장되지 않습니다. 브라우저로 열어주세요.`);
-  downloadICS(ALARM_ID);
-  $('alStepList').innerHTML = icsSteps().map(t => `<li>${t}</li>`).join('');
+  const how = await downloadICS(ALARM_ID);
+  if(!how || how === 'cancel') return;
+  $('alStepTitle').textContent = how === 'share' ? '공유 화면이 열렸습니다 · 마지막 단계'
+                                                : '파일을 받았습니다 · 마지막 단계';
+  $('alStepList').innerHTML = (how === 'share' ? shareSteps() : icsSteps())
+                                .map(t => `<li>${t}</li>`).join('');
   $('alSteps').classList.add('on');
 }
 function alarmGoogle(){ const id = ALARM_ID; googleCal(id); closeAlarm(); }
 
-function downloadICS(id){
-  const v = DATA.find(x=>x.id===id); if(!v) return;
-  if(!parseDate(v.due_date)) return toast('만료일이 올바르지 않습니다.');
-  if(!alarms().length) return toast('설정에서 알림 시점을 하나 이상 선택하세요.');
+async function downloadICS(id){
+  const v = DATA.find(x=>x.id===id); if(!v) return null;
+  if(!parseDate(v.due_date)){ toast('만료일이 올바르지 않습니다.'); return null; }
+  if(!alarms().length){ toast('알림 시점을 하나 이상 골라주세요.'); return null; }
   const slug = String(v.plate || v.name || '').replace(/[^0-9A-Za-z]/g,'');
-  saveFile(buildICS([v]).text, `car-inspection-${slug ? slug+'-' : ''}${v.due_date}.ics`);
+  return await saveFile(buildICS([v]).text, `car-inspection-${slug ? slug+'-' : ''}${v.due_date}.ics`);
 }
 
 
