@@ -74,6 +74,16 @@
   .warnbox .go{background:var(--danger);color:#fff}
   .warnbox .cp{background:var(--bg);color:var(--ink2);border:1px solid var(--line)}
   .modal .warnbox{margin-bottom:16px}
+  .urlbox{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+          font-size:11.5px;color:var(--ink2);word-break:break-all;margin-bottom:10px;
+          -webkit-user-select:all;user-select:all;line-height:1.5}
+  .manual{font-size:11.5px;color:var(--ink2);line-height:1.75;margin-top:10px;word-break:keep-all}
+  .manual b{color:var(--danger)}
+  .opts{display:flex;flex-direction:column}
+  .opt .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:5px;
+            margin-left:6px;vertical-align:2px}
+  .tag.now{background:var(--ok-soft);color:var(--ok)}
+  .tag.no{background:var(--danger-soft);color:var(--danger)}
 
   /* ---------- 상단 요약 ---------- */
   .stats{display:flex;margin:0 -14px;padding:6px 0}
@@ -278,10 +288,12 @@
   <div id="inapp" class="warnbox" style="display:none">
     <div class="t" id="inappTitle"></div>
     <p id="inappDesc"></p>
+    <div class="urlbox" id="inappUrl"></div>
     <div class="btns">
       <button class="go" onclick="openExternal()">브라우저로 열기</button>
       <button class="cp" onclick="copyLink()">주소 복사</button>
     </div>
+    <div class="manual" id="inappManual"></div>
   </div>
 
   <div id="alert" class="alert" style="display:none"></div>
@@ -414,14 +426,16 @@
       </div>
     </div>
 
-    <button class="opt primary" onclick="alarmIcs()">
-      <b>휴대폰 캘린더에 저장</b>
-      <small>알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.</small>
-    </button>
-    <button class="opt" onclick="alarmGoogle()">
-      <b>구글 캘린더에 저장</b>
-      <small>PC에서 쓰기 편합니다. 알림은 구글 캘린더에서 직접 설정하세요.</small>
-    </button>
+    <div class="opts">
+      <button class="opt primary" id="optIcs" onclick="alarmIcs()">
+        <b>휴대폰 캘린더에 저장<span class="tag no" id="tagIcs" style="display:none">지금 안 됨</span></b>
+        <small id="optIcsDesc">알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.</small>
+      </button>
+      <button class="opt" id="optGoogle" onclick="alarmGoogle()">
+        <b>구글 캘린더에 저장<span class="tag now" id="tagGoogle" style="display:none">지금 됨</span></b>
+        <small id="optGoogleDesc">PC에서 쓰기 편합니다. 알림은 구글 캘린더에서 직접 설정하세요.</small>
+      </button>
+    </div>
 
     <div class="steps" id="alSteps">
       <div class="t" id="alStepTitle">파일을 받았습니다 · 마지막 단계</div>
@@ -798,6 +812,12 @@ function isIOSDev(){
   return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
 }
 
+function manualHint(){
+  return isIOSDev()
+    ? '버튼이 듣지 않으면 화면 <b>오른쪽 아래 공유 아이콘 → Safari로 열기</b>를 누르거나, 위 주소를 길게 눌러 복사해 Safari에 붙여넣으세요.'
+    : '버튼이 듣지 않으면 화면 <b>오른쪽 위 ⋮ → 다른 브라우저로 열기(Chrome)</b>를 누르거나, 위 주소를 길게 눌러 복사해 크롬에 붙여넣으세요.';
+}
+
 function openExternal(){
   const url = location.href, ua = navigator.userAgent;
   if(/kakaotalk/i.test(ua)){
@@ -807,9 +827,19 @@ function openExternal(){
     location.href = url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1'; return;
   }
   if(/android/i.test(ua)){
-    location.href = 'intent://' + url.replace(/https?:\/\//i,'') + '#Intent;scheme=https;package=com.android.chrome;end';
+    // 크롬 지정 → 실패하면 브라우저 선택창
+    try{
+      location.href = 'intent://' + url.replace(/https?:\/\//i,'')
+        + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='
+        + encodeURIComponent(url) + ';end';
+    }catch(e){}
+    setTimeout(()=>{
+      try{ location.href = 'intent://' + url.replace(/https?:\/\//i,'') + '#Intent;scheme=https;action=android.intent.action.VIEW;end'; }catch(e){}
+    }, 900);
+    setTimeout(()=>copyLink('열리지 않으면 주소를 복사했으니 크롬에 붙여넣어 주세요.'), 2200);
     return;
   }
+  try{ window.open(url, '_blank', 'noopener'); }catch(e){}
   copyLink('주소를 복사했습니다. Safari에 붙여넣어 열어주세요.');
 }
 
@@ -897,6 +927,19 @@ function openAlarm(id){
   const app = inAppName();
   $('alInapp').style.display = app ? 'block' : 'none';
   if(app) $('alInappName').textContent = app;
+  // 앱 내 브라우저에서는 파일 저장이 막히므로 구글 쪽을 위로 올려 권합니다
+  $('optGoogle').style.order = app ? '0' : '1';
+  $('optIcs').style.order    = app ? '1' : '0';
+  $('optGoogle').classList.toggle('primary', !!app);
+  $('optIcs').classList.toggle('primary', !app);
+  $('tagGoogle').style.display = app ? 'inline-block' : 'none';
+  $('tagIcs').style.display    = app ? 'inline-block' : 'none';
+  $('optGoogleDesc').textContent = app
+    ? '이 화면에서 바로 등록됩니다. 알림은 구글 캘린더에서 직접 설정하세요.'
+    : 'PC에서 쓰기 편합니다. 알림은 구글 캘린더에서 직접 설정하세요.';
+  $('optIcsDesc').textContent = app
+    ? '알림이 자동으로 들어가지만, 이 앱 안에서는 저장이 되지 않습니다. 브라우저로 열고 쓰세요.'
+    : '알림까지 자동으로 들어갑니다. 아이폰 · 안드로이드 모두 됩니다.';
   $('alSteps').classList.remove('on');
   $('alarmModal').classList.add('on');
 }
@@ -928,10 +971,13 @@ function googleCal(id){
   const d = parseDate(v.due_date); if(!d) return toast('만료일이 올바르지 않습니다.');
   const title = `[${v.plate || v.name || '차량'}] ${v.kind || '정기검사'} 만료`;
   const details = `검사 가능 기간: ${fmtDate(v.due_date)} 전후 31일 이내` + (v.memo ? `\n메모: ${v.memo}` : '');
-  window.open('https://calendar.google.com/calendar/render?action=TEMPLATE'
+  const gurl = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
     + `&text=${encodeURIComponent(title)}&dates=${ymd(d)}/${ymd(nextDay(d))}`
     + `&details=${encodeURIComponent(details)}`
-    + (OPT.yearly ? '&recur=RRULE:FREQ=YEARLY' : ''), '_blank', 'noopener');
+    + (OPT.yearly ? '&recur=RRULE:FREQ=YEARLY' : '');
+  // 앱 내 브라우저에서는 새 창이 막히는 경우가 많아 같은 화면에서 이동합니다
+  if(inAppName()) location.href = gurl;
+  else window.open(gurl, '_blank', 'noopener');
 }
 
 /* ---------- 설정 ---------- */
@@ -997,9 +1043,10 @@ async function reload(){
     $('inapp').style.display = 'block';
     $('inappTitle').textContent = `${app} 안에서 열려 있습니다`;
     $('inappDesc').innerHTML = '이 상태에서는 <b>캘린더 알림 파일이 저장되지 않습니다.</b> '
-      + '아래 버튼으로 브라우저(크롬 · 사파리)를 열어 사용하세요. '
-      + (isIOSDev() ? '버튼이 듣지 않으면 오른쪽 아래 <b>공유 아이콘 → Safari로 열기</b>를 눌러주세요.'
-                    : '버튼이 듣지 않으면 오른쪽 위 <b>⋮ → 다른 브라우저로 열기</b>를 눌러주세요.');
+      + '다운로드가 0%에서 멈춥니다. 아래 주소를 크롬 · 사파리에서 열어 사용하세요.';
+    $('inappUrl').textContent = location.href;
+    $('inappManual').innerHTML = manualHint()
+      + '<br>한 번 브라우저로 연 뒤 <b>홈 화면에 추가</b>해두면 다음부터는 이 안내가 나오지 않습니다.';
   }
 
   const b = $('modeBadge');
