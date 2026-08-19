@@ -395,8 +395,7 @@
 
     <div class="warnbox" id="alInapp" style="display:none">
       <div class="t">여기서는 일정 저장이 안 됩니다</div>
-      <p><b id="alInappName">이 앱</b> 안에서 열려 있어서 그렇습니다.<br>
-         크롬이나 사파리로 열어주세요.</p>
+      <p id="alInappDesc"></p>
       <div class="btns">
         <button class="go" onclick="openExternal()">브라우저로 열기</button>
         <button class="cp" onclick="copyLink()">주소 복사</button>
@@ -475,6 +474,7 @@ const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 const LS_DATA='carInspection.v2', LS_OPT='carInspection.opt', LS_THEME='carInspection.theme';
 
 let DATA = [], FILTER = 'all';
+let PENDING_OPEN = null;
 let OPT = { a30:true, a7:true, a1:false, yearly:false };
 
 const $ = id => document.getElementById(id);
@@ -787,8 +787,10 @@ function isIOSDev(){
   return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
 }
 
-function openExternal(){
-  const url = location.href, ua = navigator.userAgent;
+// silent=true 면 실패해도 토스트를 띄우지 않습니다 (자동 전환용)
+function openExternal(silent, targetUrl){
+  const url = targetUrl || location.href, ua = navigator.userAgent;
+
   if(/kakaotalk/i.test(ua)){
     location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url); return;
   }
@@ -796,13 +798,41 @@ function openExternal(){
     location.href = url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1'; return;
   }
   if(/android/i.test(ua)){
-    location.href = 'intent://' + url.replace(/https?:\/\//i,'')
-      + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='
-      + encodeURIComponent(url) + ';end';
-    setTimeout(()=>copyLink('안 열리면 주소를 복사했으니 크롬에 붙여넣어 주세요.'), 1800);
+    const bare = url.replace(/https?:\/\//i,'');
+    // ① 휴대폰에 설정된 기본 브라우저 (삼성인터넷 · 크롬 · 웨일 무엇이든)
+    location.href = 'intent://' + bare + '#Intent;scheme=https;action=android.intent.action.VIEW;end';
+    // ② 안 열리면 크롬을 직접 지정
+    setTimeout(()=>{
+      if(document.hidden) return;
+      try{ location.href = 'intent://' + bare + '#Intent;scheme=https;package=com.android.chrome;end'; }catch(e){}
+    }, 800);
+    if(!silent) setTimeout(()=>{ if(!document.hidden) copyLink('안 열리면 주소를 복사했으니 브라우저에 붙여넣어 주세요.'); }, 2000);
     return;
   }
-  copyLink('주소를 복사했습니다. 사파리에 붙여넣어 주세요.');
+  if(!silent) copyLink('주소를 복사했습니다. 사파리에 붙여넣어 주세요.');
+}
+
+/* 막힌 환경이면 말없이 브라우저로 넘겨보고,
+   1.8초 뒤에도 그대로 있으면 그때 안내를 띄웁니다. */
+function jumpToBrowser(app){
+  let left = false;
+  const mark = () => { left = true; };
+  document.addEventListener('visibilitychange', mark);
+  window.addEventListener('pagehide', mark);
+
+  toast('브라우저로 넘어갑니다…');
+  // 넘어간 브라우저에서 바로 이 차량 창이 열리도록 표시를 붙입니다
+  openExternal(true, location.href.split('#')[0] + '#v=' + encodeURIComponent(ALARM_ID || ''));
+
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', mark);
+    window.removeEventListener('pagehide', mark);
+    if(left || document.hidden) return;          // 전환 성공
+    $('alInappDesc').innerHTML = `<b>${esc(app)}</b> 안에서 열려 있어서 그렇습니다.<br>`
+      + (isIOSDev() ? '아래 버튼으로 사파리에서 열어주세요.' : '아래 버튼으로 브라우저에서 열어주세요.');
+    $('alInapp').style.display = 'block';
+    $('alInapp').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }, 1800);
 }
 
 async function copyLink(msg){
@@ -899,13 +929,11 @@ function closeAlarm(){
 async function alarmIcs(){
   if(!alarms().length) return toast('위에서 알림 시점을 하나 이상 골라주세요.');
 
-  // 저장이 막힌 환경(카톡·메일 앱 등)이면 여기서 안내
+  // 저장이 막힌 환경(카톡 · 메일 앱 등)이면 말없이 브라우저로 넘깁니다
   const app = inAppName();
   if(app){
-    $('alInappName').textContent = app;
-    $('alInapp').style.display = 'block';
     $('alSteps').classList.remove('on');
-    $('alInapp').scrollIntoView({behavior:'smooth', block:'nearest'});
+    jumpToBrowser(app);
     return;
   }
 
@@ -989,6 +1017,11 @@ async function reload(){
     $('alert').innerHTML = `<b>공유 서버에 연결하지 못했습니다.</b> 잠시 후 다시 시도하거나 관리자에게 문의하세요.<br>${esc(e.message).slice(0,160)}`;
   }
   render();
+
+  if(PENDING_OPEN){
+    const id = PENDING_OPEN; PENDING_OPEN = null;
+    if(DATA.some(v => v.id === id)) setTimeout(() => openAlarm(id), 200);
+  }
 }
 
 (function init(){
@@ -1009,6 +1042,13 @@ async function reload(){
   document.addEventListener('keydown', e => {
     if(e.key === 'Escape'){ closeEdit(); closeAlarm(); $('setModal').classList.remove('on'); }
   });
+
+  // 브라우저로 넘어오면서 붙은 표시가 있으면, 목록을 불러온 뒤 그 차량 창을 엽니다
+  const hv = /^#v=(.+)$/.exec(location.hash || '');
+  if(hv){
+    PENDING_OPEN = decodeURIComponent(hv[1]);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
 
   reload();
 })();
